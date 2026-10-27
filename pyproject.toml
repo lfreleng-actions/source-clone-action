@@ -81,9 +81,10 @@ Issues = "https://github.com/lfreleng-actions/source-clone-action/issues"
 Changelog = "https://github.com/lfreleng-actions/source-clone-action/releases"
 
 [project.scripts]
+# Only source-clone: the gerrit-clone command belongs to the old
+# gerrit-clone package, and uv tool or pipx refuse to install two tools
+# that provide the same command.
 source-clone = "source_clone.cli:app"
-# Alias kept so existing scripts and workflows keep working.
-gerrit-clone = "source_clone.cli:app"
 
 # Hatchling build configuration
 [tool.hatch.version]

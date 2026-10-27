@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 The Linux Foundation
 
-"""The tool is named ``source-clone``; ``gerrit-clone`` stays an alias.
+"""The tool is named ``source-clone``, and installs that command alone.
 
 The distribution, command, help and version strings use the new name.
 Every name an earlier release wrote into users' trees and repositories
@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 DISTRIBUTION = "source-clone"
-COMMANDS = {"source-clone", "gerrit-clone"}
 
 
 def _flat(text: str) -> str:
@@ -38,19 +37,6 @@ class TestDistribution:
     def test_the_distribution_version_resolves(self) -> None:
         assert version(DISTRIBUTION)
 
-    def test_both_commands_run_the_same_cli(self) -> None:
-        scripts = {
-            entry.name: entry
-            for entry in distribution(DISTRIBUTION).entry_points
-            if entry.group == "console_scripts"
-        }
-        assert set(scripts) >= COMMANDS
-        targets = {scripts[name].value for name in COMMANDS}
-        assert len(targets) == 1
-        assert targets == {"source_clone.cli:app"}
-        assert all(scripts[name].load() is cli.app for name in COMMANDS)
-
-    @pytest.mark.xfail(strict=True, reason="still installs a gerrit-clone command")
     def test_installs_only_source_clone(self) -> None:
         """Only ``source-clone``: the old ``gerrit-clone`` package owns that name.
 
@@ -65,6 +51,14 @@ class TestDistribution:
             if entry.group == "console_scripts"
         }
         assert scripts == {"source-clone": "source_clone.cli:app"}
+        assert (
+            next(
+                entry
+                for entry in distribution(DISTRIBUTION).entry_points
+                if entry.name == "source-clone"
+            ).load()
+            is cli.app
+        )
 
 
 class TestUserFacingName:

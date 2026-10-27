@@ -61,7 +61,7 @@ jobs:
           version: '0.13.4'
           python-version: '3.11'
 
-      - name: "Install gerrit-clone CLI"
+      - name: "Install source-clone CLI"
         shell: bash
         run: |
           # Hash-pinned via uv.lock; --locked rejects lockfile drift.
@@ -80,7 +80,7 @@ jobs:
       - name: "Test CLI Tool: gerrit.o-ran-sc.org [HTTPS]"
         shell: bash
         run: |
-          gerrit-clone clone \
+          source-clone clone \
             --host "$GERRIT_HOST" \
             --output-path "cli-https" \
             --threads "2" \
