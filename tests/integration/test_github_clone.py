@@ -22,6 +22,11 @@ from source_clone.clone_manager import clone_repositories
 from source_clone.github_discovery import discover_github_repositories
 from source_clone.models import CloneStatus, Config, DiscoveryMethod, SourceType
 
+# This repository. GitHub lists a renamed repository only under its new
+# name, so the include filters below match nothing until this follows a
+# rename.
+KNOWN_REPO = "source-clone-action"
+
 
 @pytest.fixture
 def github_token() -> str:
@@ -81,8 +86,6 @@ class TestGitHubClone:
         tmp_clone_dir: Path,
     ) -> None:
         """Test cloning a single repository using include filter."""
-        # Use a small, known repository from lfreleng-actions
-        # Note: This test will need to be updated if the repo doesn't exist
         config = Config(
             host="github.com/lfreleng-actions",
             source_type=SourceType.GITHUB,
@@ -90,7 +93,7 @@ class TestGitHubClone:
             github_token=github_token,
             discovery_method=DiscoveryMethod.GITHUB_API,
             path=tmp_clone_dir,
-            include_projects=["gerrit-clone-action"],  # Known repo
+            include_projects=[KNOWN_REPO],
             threads=1,
             mirror=False,  # Use regular clone (not bare) for testing
             # Clone over HTTPS with the token so this passes on fork PRs,
@@ -98,11 +101,13 @@ class TestGitHubClone:
             use_https=True,
         )
 
-        # Discover and verify the repository exists
+        # Assert rather than skip: this repository always exists, so an
+        # empty result means KNOWN_REPO no longer names it.
         projects, _ = discover_github_repositories(config)
-
-        if not projects:
-            pytest.skip("gerrit-clone-action repository not found in lfreleng-actions")
+        assert any(p.name == KNOWN_REPO for p in projects), (
+            f"lfreleng-actions lists no repository named {KNOWN_REPO}; "
+            "update KNOWN_REPO if it was renamed"
+        )
 
         # Clone the repository
         batch_result = clone_repositories(config)
@@ -112,7 +117,7 @@ class TestGitHubClone:
         assert batch_result.failed_count == 0
 
         # Verify repository exists on disk
-        repo_path = tmp_clone_dir / "gerrit-clone-action"
+        repo_path = tmp_clone_dir / KNOWN_REPO
         assert repo_path.exists()
 
         # Verify it's a valid git repository
@@ -133,7 +138,7 @@ class TestGitHubClone:
             github_token=github_token,
             discovery_method=DiscoveryMethod.GITHUB_API,
             path=tmp_clone_dir,
-            include_projects=["gerrit-clone-action"],
+            include_projects=[KNOWN_REPO],
             depth=1,
             threads=1,
             use_https=True,
@@ -190,7 +195,7 @@ class TestGitHubClone:
             github_token=github_token,
             discovery_method=DiscoveryMethod.GITHUB_API,
             path=tmp_clone_dir,
-            include_projects=["gerrit-clone-action"],
+            include_projects=[KNOWN_REPO],
             threads=1,
             use_https=True,
         )
@@ -230,7 +235,7 @@ class TestGitHubClone:
             github_token=github_token,
             discovery_method=DiscoveryMethod.GITHUB_API,
             path=tmp_clone_dir,
-            include_projects=["gerrit-clone-action"],
+            include_projects=[KNOWN_REPO],
             threads=1,
             auto_refresh=False,  # Disable auto-refresh
             use_https=True,
@@ -271,7 +276,7 @@ class TestGitHubCloneWithGhCli:
             github_token=github_token,
             discovery_method=DiscoveryMethod.GITHUB_API,
             path=tmp_clone_dir,
-            include_projects=["gerrit-clone-action"],
+            include_projects=[KNOWN_REPO],
             use_gh_cli=True,
             threads=1,
             mirror=False,  # Use regular clone (not bare) for testing
@@ -285,7 +290,7 @@ class TestGitHubCloneWithGhCli:
         assert batch_result.failed_count == 0
 
         # Verify repository exists on disk
-        repo_path = tmp_clone_dir / "gerrit-clone-action"
+        repo_path = tmp_clone_dir / KNOWN_REPO
         assert repo_path.exists()
 
         # Verify it's a valid git repository
