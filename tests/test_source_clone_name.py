@@ -50,6 +50,22 @@ class TestDistribution:
         assert targets == {"source_clone.cli:app"}
         assert all(scripts[name].load() is cli.app for name in COMMANDS)
 
+    @pytest.mark.xfail(strict=True, reason="still installs a gerrit-clone command")
+    def test_installs_only_source_clone(self) -> None:
+        """Only ``source-clone``: the old ``gerrit-clone`` package owns that name.
+
+        ``uv tool`` and ``pipx`` refuse to install a second tool providing
+        a command another installed tool already provides, so a
+        ``gerrit-clone`` alias here makes ``source-clone`` fail to
+        install wherever the old package is installed.
+        """
+        scripts = {
+            entry.name: entry.value
+            for entry in distribution(DISTRIBUTION).entry_points
+            if entry.group == "console_scripts"
+        }
+        assert scripts == {"source-clone": "source_clone.cli:app"}
+
 
 class TestUserFacingName:
     """Help and version output name ``source-clone``."""

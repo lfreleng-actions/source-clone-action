@@ -615,3 +615,18 @@ class TestActionRunsSourceClone:
     def test_command_array_starts_source_clone(self, action_shell_script: str) -> None:
         assert "cmd=(source-clone clone)" in action_shell_script
         assert "gerrit-clone" not in action_shell_script
+
+
+@pytest.mark.xfail(strict=True, reason="CI still runs the gerrit-clone alias")
+def test_ci_runs_source_clone() -> None:
+    """CI calls the command the package installs, never ``gerrit-clone``."""
+    workflow = yaml.safe_load(
+        (ACTION_YAML_PATH.parent / ".github" / "workflows" / "testing.yaml").read_text()
+    )
+    commands = "\n".join(
+        str(step.get("run", ""))
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", [])
+    )
+    assert "source-clone clone" in commands
+    assert "gerrit-clone" not in commands
