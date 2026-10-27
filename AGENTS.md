@@ -41,7 +41,7 @@ earlier `action.yaml` passes: renaming or removing one breaks callers
 on that default route whose pinned action commit predates the change.
 Action commits from before the rename run `uvx gerrit-clone` instead,
 and keep getting the last `gerrit-clone` release from PyPI, so later
-`source-clone` releases never reach them. The package also installs a
-`gerrit-clone` command, so the same rule applies to it.
+`source-clone` releases never reach them. The package installs no
+`gerrit-clone` command: that name belongs to the old package.
 CI puts this branch's CLI on `PATH` first, so it never takes that
 route and cannot catch the breakage.

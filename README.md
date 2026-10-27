@@ -15,8 +15,10 @@ reliability, speed, and CI/CD compatibility.
 This tool used to be `gerrit-clone`. The PyPI package and the command are now
 `source-clone`.
 
-- The `gerrit-clone` command still works: the package installs it as an alias
-  of `source-clone`.
+- `source-clone` installs only the `source-clone` command. The `gerrit-clone`
+  command belongs to the old `gerrit-clone` package, which can stay installed
+  beside it. To switch, run
+  `uv tool uninstall gerrit-clone && uv tool install source-clone`.
 - Environment variables (`GERRIT_*`, `GERRIT_CLONE_TOKEN`, `OUTPUT_PATH` and
   the rest), command options and Action inputs have not changed.
 - Names the tool writes into your trees and repositories keep the old name, so

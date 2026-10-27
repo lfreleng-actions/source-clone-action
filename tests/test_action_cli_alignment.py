@@ -331,12 +331,11 @@ class TestBooleanFlagConsistency:
 class TestCLIFlagExecution:
     """Test that CLI flags can actually be parsed (without executing clone)."""
 
-    @pytest.mark.parametrize("command", ["source-clone", "gerrit-clone"])
-    def test_output_path_flag_is_accepted(self, tmp_path: Path, command: str) -> None:
-        """Verify --output-path flag is accepted by CLI under either name."""
+    def test_output_path_flag_is_accepted(self, tmp_path: Path) -> None:
+        """Verify --output-path flag is accepted by the CLI."""
         result = subprocess.run(
             [
-                command,
+                "source-clone",
                 "clone",
                 "--host",
                 "test.example.org",
@@ -350,7 +349,7 @@ class TestCLIFlagExecution:
         )
         # Verify the command succeeded (help should return 0)
         assert result.returncode == 0, (
-            f"{command} failed with code {result.returncode}.\n"
+            f"source-clone failed with code {result.returncode}.\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
         )
@@ -615,3 +614,17 @@ class TestActionRunsSourceClone:
     def test_command_array_starts_source_clone(self, action_shell_script: str) -> None:
         assert "cmd=(source-clone clone)" in action_shell_script
         assert "gerrit-clone" not in action_shell_script
+
+
+def test_ci_runs_source_clone() -> None:
+    """CI calls the command the package installs, never ``gerrit-clone``."""
+    workflow = yaml.safe_load(
+        (ACTION_YAML_PATH.parent / ".github" / "workflows" / "testing.yaml").read_text()
+    )
+    commands = "\n".join(
+        str(step.get("run", ""))
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", [])
+    )
+    assert "source-clone clone" in commands
+    assert "gerrit-clone" not in commands
