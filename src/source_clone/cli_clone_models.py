@@ -74,3 +74,6 @@ class CloneRequest:
     redact_secrets: bool
     # Where github_token came from, for logs; never the token itself
     github_token_source: str = "--github-token"
+    # Files of include/exclude patterns, merged with the lists above
+    include_projects_files: list[Path] | None = None
+    exclude_projects_files: list[Path] | None = None

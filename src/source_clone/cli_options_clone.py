@@ -132,6 +132,29 @@ EXCLUDE_PROJECTS = typer.Option(
     ),
     envvar=None,
 )
+INCLUDE_PROJECTS_FILE = typer.Option(
+    None,
+    "--include-projects-file",
+    help=(
+        "Read --include-projects patterns from a file: names or globs, "
+        "separated by commas, spaces or new lines; '#' starts a comment. "
+        "Merged with --include-projects. A file naming nothing is an "
+        "error. Repeatable."
+    ),
+    dir_okay=False,
+    envvar=None,
+)
+EXCLUDE_PROJECTS_FILE = typer.Option(
+    None,
+    "--exclude-projects-file",
+    help=(
+        "Read --exclude-projects patterns from a file, in the format "
+        "--include-projects-file takes. Merged with --exclude-projects. "
+        "Repeatable."
+    ),
+    dir_okay=False,
+    envvar=None,
+)
 SSH_DEBUG = typer.Option(
     False,
     "--ssh-debug",

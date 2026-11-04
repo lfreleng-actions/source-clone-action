@@ -698,6 +698,7 @@ for name in SOURCE_CLONE_TOKEN GERRIT_CLONE_TOKEN GITHUB_TOKEN; do
     printf '%s\\n' "$name"
   fi
 done > "$STUB_TOKENS"
+exit "${STUB_EXIT:-0}"
 """
 
 # Inputs the step reads unconditionally, at their action.yaml defaults
@@ -749,7 +750,10 @@ class ActionCloneStep:
         self.output_path.mkdir()
 
     def run(self, **inputs: str) -> ClonedStep:
-        """Run the step with ``INPUT_*`` overrides, in the workspace."""
+        """Run the step with ``INPUT_*`` overrides, in the workspace.
+
+        ``STUB_EXIT`` sets the status the stub CLI exits with.
+        """
         for name in ("args", "tokens"):
             (self.stub / name).unlink(missing_ok=True)
         env = {

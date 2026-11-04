@@ -40,6 +40,8 @@ def clone(
     skip_archived: bool = opts.SKIP_ARCHIVED,
     include_projects: list[str] | None = opts.INCLUDE_PROJECTS,
     exclude_projects: list[str] | None = opts.EXCLUDE_PROJECTS,
+    include_projects_file: list[Path] | None = opts.INCLUDE_PROJECTS_FILE,
+    exclude_projects_file: list[Path] | None = opts.EXCLUDE_PROJECTS_FILE,
     ssh_debug: bool = opts.SSH_DEBUG,
     discovery_method: str | None = opts.DISCOVERY_METHOD,
     allow_nested_git: bool = opts.ALLOW_NESTED_GIT,
@@ -108,6 +110,9 @@ def clone(
         # Clone to specific directory with custom threads
         source-clone clone --host gerrit.example.org --output-path ./repos --threads 8
 
+        # Clone the GitHub repositories a file lists, as working trees
+        source-clone clone --host github.com/myorg --no-mirror --depth 1 --include-projects-file repos.txt
+
         # Clone with shallow depth and specific branch
         source-clone clone --host gerrit.example.org --no-mirror --depth 10 --branch main
 
@@ -140,6 +145,8 @@ def clone(
         skip_archived=skip_archived,
         include_projects=include_projects,
         exclude_projects=exclude_projects,
+        include_projects_files=include_projects_file,
+        exclude_projects_files=exclude_projects_file,
         ssh_debug=ssh_debug,
         discovery_method=discovery_method,
         allow_nested_git=allow_nested_git,

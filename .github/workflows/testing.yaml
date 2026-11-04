@@ -7,6 +7,8 @@
 # Interim regime: anonymous HTTPS clones of a few small projects on the
 # public O-RAN-SC Gerrit, run for both the composite action and the CLI.
 # No credentials are used, so the job is safe to run on pull requests.
+# The GitHub source test uses only the read-only workflow token to list
+# and clone this public repository.
 # SSH coverage returns with a disposable Gerrit container and a per-run
 # key; the content-filter tests return once they pass against bare
 # mirror clones.
@@ -133,3 +135,40 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           done
           exit "$status"
+
+      # A GitHub source under the default mirror: auto should produce a
+      # working tree, not a bare mirror, and read its project list from a
+      # file inside the workspace.
+      - name: "Write GitHub project list file"
+        shell: bash
+        run: |
+          printf '%s\n' '# Project list for the GitHub source test' \
+            'source-clone-action' > github-projects.txt
+
+      - name: "Test GitHub Action: github.com [mirror: auto]"
+        id: action-github
+        uses: $/
+        with:
+          host: "github.com/lfreleng-actions"
+          github-token: ${{ github.token }}
+          output-path: "action-github"
+          include-projects-file: "github-projects.txt"
+          use-https: "true"
+
+      - name: "Validate GitHub clone is a working tree"
+        shell: bash
+        env:
+          GITHUB_MANIFEST: ${{ steps.action-github.outputs.manifest-path }}
+        run: |
+          repo="action-github/source-clone-action"
+          if [ "$(git -C "$repo" rev-parse --is-inside-work-tree \
+            2>/dev/null)" != "true" ] || [ ! -f "$repo/action.yaml" ]; then
+            echo "::error::$repo is not a working-tree clone"
+            exit 1
+          fi
+          included=$(jq -c '.config.include_projects' "$GITHUB_MANIFEST")
+          if [ "$included" != '["source-clone-action"]' ]; then
+            echo "::error::manifest include_projects is $included"
+            exit 1
+          fi
+          echo "- GitHub working tree: $repo" >> "$GITHUB_STEP_SUMMARY"

@@ -69,6 +69,18 @@ inputs:
       Supports shell-style wildcards (*, ?, [seq]), hierarchical matching,
       and comma or space-separated lists.
     required: false
+  include-projects-file:
+    description: >-
+      File listing projects to clone, relative to the workspace: names or
+      globs separated by commas, spaces or new lines, with '#' starting a
+      comment. Merged with include-projects. A file naming nothing, or
+      resolving outside the workspace, is an error.
+    required: false
+  exclude-projects-file:
+    description: >-
+      File listing projects to exclude, in the include-projects-file
+      format. Merged with exclude-projects.
+    required: false
   ssh-debug:
     description: >-
       Enable verbose SSH (-vvv) for troubleshooting authentication
@@ -450,6 +462,8 @@ runs:
       env:
         INPUT_INCLUDE_PROJECTS: ${{ inputs.include-projects }}
         INPUT_EXCLUDE_PROJECTS: ${{ inputs.exclude-projects }}
+        INPUT_INCLUDE_PROJECTS_FILE: ${{ inputs.include-projects-file }}
+        INPUT_EXCLUDE_PROJECTS_FILE: ${{ inputs.exclude-projects-file }}
         INPUT_HOST: ${{ inputs.host }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         INPUT_HTTP_PASSWORD: ${{ inputs.http-password }}
@@ -753,6 +767,37 @@ runs:
           done
         fi
 
+        # Project list files: relative to the workspace, and refused
+        # when they resolve outside it, through a symlink or "..".
+        workspace=$(realpath -- "${GITHUB_WORKSPACE:-$PWD}")
+        for kind in include exclude; do
+          if [ "$kind" = "include" ]; then
+            list_file="${INPUT_INCLUDE_PROJECTS_FILE}"
+          else
+            list_file="${INPUT_EXCLUDE_PROJECTS_FILE}"
+          fi
+          if [ -z "$list_file" ]; then
+            continue
+          fi
+          case "$list_file" in
+            /*) candidate="$list_file" ;;
+            *) candidate="$workspace/$list_file" ;;
+          esac
+          if ! resolved=$(realpath -e -- "$candidate" 2>/dev/null); then
+            echo "::error::${kind}-projects-file not found: $list_file"
+            exit 1
+          fi
+          case "$resolved" in
+            "$workspace"/*) ;;
+            *)
+              echo "::error::${kind}-projects-file is outside the" \
+                "workspace: $list_file"
+              exit 1
+              ;;
+          esac
+          cmd+=("--${kind}-projects-file" "$resolved")
+        done
+
         if [ "${INPUT_SSH_DEBUG}" = "true" ]; then
           cmd+=(--ssh-debug)
         fi
@@ -824,11 +869,10 @@ runs:
 
         # Execute and capture exit code.
         # GitHub Actions runs bash with -e, so a bare invocation
-        # would terminate the script before exit_code is set.
+        # would terminate the script before exit_code is set. Inside
+        # "if ! cmd", $? holds the negated status (0), so use "||".
         exit_code=0
-        if ! "${cmd[@]}"; then
-          exit_code=$?
-        fi
+        "${cmd[@]}" || exit_code=$?
 
         # Set outputs from manifest file
         # The CLI auto-adjusts the output path

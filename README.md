@@ -702,6 +702,8 @@ Options:
   --exclude-projects, --exclude-project TEXT
                                   Exclude project(s); supports wildcard and
                                   hierarchical (path-style) matching
+  --include-projects-file FILE    Read include patterns from a file; repeatable
+  --exclude-projects-file FILE    Read exclude patterns from a file; repeatable
   --discovery-method TEXT         Method for discovering projects: ssh (default),
                                   http (REST API), or both (union of both methods
                                   with SSH metadata preferred)
@@ -747,6 +749,27 @@ Options:
   -q, --quiet                     Suppress all output except errors
   --version                       Show version information
   --help                          Show this message and exit
+```
+
+#### Project List Files
+
+`--include-projects-file` and `--exclude-projects-file` read patterns from
+a file, one or more per line, separated by commas or spaces. A `#` starts a
+comment that runs to the end of the line, and the tool skips blank lines.
+The tool adds the file patterns after any `--include-projects` or
+`--exclude-projects` patterns. A file that names no project is an error,
+which keeps an empty list from widening a run to every project. The manifest's
+`config` block records the effective `include_projects` and
+`exclude_projects` lists.
+
+```text
+# estate.txt
+releng/*
+ci-management  # shared CI jobs
+```
+
+```bash
+source-clone clone --host github.com/myorg --include-projects-file estate.txt
 ```
 
 ### Mirror Command Options
@@ -1319,56 +1342,58 @@ jobs:
 
 <!-- markdownlint-disable MD013 -->
 
-| Input                  | Required | Default               | Description                                                                                                                                                        |
-| ---------------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `host`                 | Yes      |                       | Source hostname (Gerrit server or GitHub URL like `github.com/ORG`)                                                                                                |
-| `port`                 | No       | `29418`               | Gerrit SSH port                                                                                                                                                    |
-| `base-url`             | No       |                       | Base URL for Gerrit API (defaults to <https://HOST>)                                                                                                               |
-| `ssh-user`             | No       |                       | SSH username for clone operations                                                                                                                                  |
-| `ssh-private-key`      | No       |                       | SSH private key content for authentication                                                                                                                         |
-| `source-type`          | No       |                       | Source type: `gerrit` or `github` (auto-detected from host)                                                                                                        |
-| `github-token`         | No       |                       | GitHub personal access token; required for GitHub sources, public or private                                                                                       |
-| `github-org`           | No       |                       | GitHub organization or user (auto-detected from host)                                                                                                              |
-| `use-gh-cli`           | No       | `false`               | Use GitHub CLI (`gh`) for cloning instead of git                                                                                                                   |
-| `mirror`               | No       | `auto`                | `auto` mirrors Gerrit sources and makes working-tree clones of GitHub sources; `true` always mirrors; `false` always makes working-tree clones                     |
-| `output-path`          | No       | `.`                   | Clone destination; an empty value or a spelling of `.` such as `./` creates `./{SERVER}/` or `./github.com/{ORG}/`; the tool uses any other value exactly as given |
-| `skip-archived`        | No       | `true`                | Skip archived and inactive repositories                                                                                                                            |
-| `include-projects`     | No       |                       | Restrict to specific project(s); comma/space-separated, wildcard and hierarchical patterns                                                                         |
-| `exclude-projects`     | No       |                       | Exclude specific project(s); comma/space-separated, wildcard and hierarchical patterns                                                                             |
-| `ssh-debug`            | No       | `false`               | Enable verbose SSH (-vvv) for troubleshooting                                                                                                                      |
-| `allow-nested-git`     | No       | `true`                | Allow nested git working trees                                                                                                                                     |
-| `nested-protection`    | No       | `true`                | Auto-add nested child repo paths to parent .git/info/exclude                                                                                                       |
-| `move-conflicting`     | No       | `false`               | Move conflicting files/directories in parent repos to [NAME].parent                                                                                                |
-| `exit-on-error`        | No       | `false`               | Exit when first error occurs                                                                                                                                       |
-| `no-refresh`           | No       | `false`               | Skip refreshing existing repositories                                                                                                                              |
-| `force-refresh`        | No       | `false`               | Force refresh all existing repos (auto-stash, fix detached HEAD)                                                                                                   |
-| `force`                | No       | `false`               | Same as `force-refresh`: force refresh all existing repos (auto-stash, fix detached HEAD)                                                                          |
-| `fetch-only`           | No       | `false`               | Only fetch changes without merging (existing repos)                                                                                                                |
-| `skip-conflicts`       | No       | `true`                | Skip repos with uncommitted changes during refresh                                                                                                                 |
-| `threads`              | No       | auto                  | Number of concurrent clone threads                                                                                                                                 |
-| `depth`                | No       |                       | Create shallow clone with given depth                                                                                                                              |
-| `branch`               | No       |                       | Clone specific branch instead of default                                                                                                                           |
-| `use-https`            | No       | `false`               | Use HTTPS for cloning instead of SSH                                                                                                                               |
-| `https`                | No       | `false`               | Same as `use-https`: use HTTPS for cloning instead of SSH                                                                                                          |
-| `http-user`            | No       |                       | HTTP username for Gerrit HTTPS authentication                                                                                                                      |
-| `http-password`        | No       |                       | HTTP password for Gerrit HTTPS authentication                                                                                                                      |
-| `no-netrc`             | No       | `false`               | Disable .netrc credential lookup for HTTP auth                                                                                                                     |
-| `netrc-file`           | No       |                       | Explicit path to .netrc file for HTTP credentials                                                                                                                  |
-| `netrc-optional`       | No       | `true`                | Whether missing .netrc is acceptable (false = fail if not found)                                                                                                   |
-| `keep-remote-protocol` | No       | `false`               | Keep original clone protocol for remote                                                                                                                            |
-| `strict-host`          | No       | `true`                | SSH strict host key checking                                                                                                                                       |
-| `clone-timeout`        | No       | `600`                 | Timeout per clone operation in seconds                                                                                                                             |
-| `retry-attempts`       | No       | `3`                   | Max retry attempts per repository                                                                                                                                  |
-| `retry-base-delay`     | No       | `2.0`                 | Base delay for retry backoff in seconds                                                                                                                            |
-| `retry-factor`         | No       | `2.0`                 | Exponential backoff factor for retries                                                                                                                             |
-| `retry-max-delay`      | No       | `30.0`                | Max retry delay in seconds                                                                                                                                         |
-| `manifest-filename`    | No       | `clone-manifest.json` | Output manifest filename                                                                                                                                           |
-| `config-file`          | No       |                       | Configuration file path (YAML or JSON)                                                                                                                             |
-| `verbose`              | No       | `false`               | Enable verbose/debug output                                                                                                                                        |
-| `quiet`                | No       | `false`               | Suppress all output except errors                                                                                                                                  |
-| `log-file`             | No       |                       | Custom log file path                                                                                                                                               |
-| `disable-log-file`     | No       | `false`               | Disable creation of log file                                                                                                                                       |
-| `log-level`            | No       | `DEBUG`               | File logging level                                                                                                                                                 |
+| Input                   | Required | Default               | Description                                                                                                                                                        |
+| ----------------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `host`                  | Yes      |                       | Source hostname (Gerrit server or GitHub URL like `github.com/ORG`)                                                                                                |
+| `port`                  | No       | `29418`               | Gerrit SSH port                                                                                                                                                    |
+| `base-url`              | No       |                       | Base URL for Gerrit API (defaults to <https://HOST>)                                                                                                               |
+| `ssh-user`              | No       |                       | SSH username for clone operations                                                                                                                                  |
+| `ssh-private-key`       | No       |                       | SSH private key content for authentication                                                                                                                         |
+| `source-type`           | No       |                       | Source type: `gerrit` or `github` (auto-detected from host)                                                                                                        |
+| `github-token`          | No       |                       | GitHub personal access token; required for GitHub sources, public or private                                                                                       |
+| `github-org`            | No       |                       | GitHub organization or user (auto-detected from host)                                                                                                              |
+| `use-gh-cli`            | No       | `false`               | Use GitHub CLI (`gh`) for cloning instead of git                                                                                                                   |
+| `mirror`                | No       | `auto`                | `auto` mirrors Gerrit sources and makes working-tree clones of GitHub sources; `true` always mirrors; `false` always makes working-tree clones                     |
+| `output-path`           | No       | `.`                   | Clone destination; an empty value or a spelling of `.` such as `./` creates `./{SERVER}/` or `./github.com/{ORG}/`; the tool uses any other value exactly as given |
+| `skip-archived`         | No       | `true`                | Skip archived and inactive repositories                                                                                                                            |
+| `include-projects`      | No       |                       | Restrict to specific project(s); comma/space-separated, wildcard and hierarchical patterns                                                                         |
+| `exclude-projects`      | No       |                       | Exclude specific project(s); comma/space-separated, wildcard and hierarchical patterns                                                                             |
+| `include-projects-file` | No       |                       | Path, relative to the workspace, to a file of include patterns; the file must exist inside the workspace and name a project                                        |
+| `exclude-projects-file` | No       |                       | Path, relative to the workspace, to a file of exclude patterns; the file must exist inside the workspace and name a project                                        |
+| `ssh-debug`             | No       | `false`               | Enable verbose SSH (-vvv) for troubleshooting                                                                                                                      |
+| `allow-nested-git`      | No       | `true`                | Allow nested git working trees                                                                                                                                     |
+| `nested-protection`     | No       | `true`                | Auto-add nested child repo paths to parent .git/info/exclude                                                                                                       |
+| `move-conflicting`      | No       | `false`               | Move conflicting files/directories in parent repos to [NAME].parent                                                                                                |
+| `exit-on-error`         | No       | `false`               | Exit when first error occurs                                                                                                                                       |
+| `no-refresh`            | No       | `false`               | Skip refreshing existing repositories                                                                                                                              |
+| `force-refresh`         | No       | `false`               | Force refresh all existing repos (auto-stash, fix detached HEAD)                                                                                                   |
+| `force`                 | No       | `false`               | Same as `force-refresh`: force refresh all existing repos (auto-stash, fix detached HEAD)                                                                          |
+| `fetch-only`            | No       | `false`               | Only fetch changes without merging (existing repos)                                                                                                                |
+| `skip-conflicts`        | No       | `true`                | Skip repos with uncommitted changes during refresh                                                                                                                 |
+| `threads`               | No       | auto                  | Number of concurrent clone threads                                                                                                                                 |
+| `depth`                 | No       |                       | Create shallow clone with given depth                                                                                                                              |
+| `branch`                | No       |                       | Clone specific branch instead of default                                                                                                                           |
+| `use-https`             | No       | `false`               | Use HTTPS for cloning instead of SSH                                                                                                                               |
+| `https`                 | No       | `false`               | Same as `use-https`: use HTTPS for cloning instead of SSH                                                                                                          |
+| `http-user`             | No       |                       | HTTP username for Gerrit HTTPS authentication                                                                                                                      |
+| `http-password`         | No       |                       | HTTP password for Gerrit HTTPS authentication                                                                                                                      |
+| `no-netrc`              | No       | `false`               | Disable .netrc credential lookup for HTTP auth                                                                                                                     |
+| `netrc-file`            | No       |                       | Explicit path to .netrc file for HTTP credentials                                                                                                                  |
+| `netrc-optional`        | No       | `true`                | Whether missing .netrc is acceptable (false = fail if not found)                                                                                                   |
+| `keep-remote-protocol`  | No       | `false`               | Keep original clone protocol for remote                                                                                                                            |
+| `strict-host`           | No       | `true`                | SSH strict host key checking                                                                                                                                       |
+| `clone-timeout`         | No       | `600`                 | Timeout per clone operation in seconds                                                                                                                             |
+| `retry-attempts`        | No       | `3`                   | Max retry attempts per repository                                                                                                                                  |
+| `retry-base-delay`      | No       | `2.0`                 | Base delay for retry backoff in seconds                                                                                                                            |
+| `retry-factor`          | No       | `2.0`                 | Exponential backoff factor for retries                                                                                                                             |
+| `retry-max-delay`       | No       | `30.0`                | Max retry delay in seconds                                                                                                                                         |
+| `manifest-filename`     | No       | `clone-manifest.json` | Output manifest filename                                                                                                                                           |
+| `config-file`           | No       |                       | Configuration file path (YAML or JSON)                                                                                                                             |
+| `verbose`               | No       | `false`               | Enable verbose/debug output                                                                                                                                        |
+| `quiet`                 | No       | `false`               | Suppress all output except errors                                                                                                                                  |
+| `log-file`              | No       |                       | Custom log file path                                                                                                                                               |
+| `disable-log-file`      | No       | `false`               | Disable creation of log file                                                                                                                                       |
+| `log-level`             | No       | `DEBUG`               | File logging level                                                                                                                                                 |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -1523,7 +1548,9 @@ Each run generates a detailed JSON manifest (`clone-manifest.json`):
     "depth": null,
     "branch": null,
     "strict_host_checking": true,
-    "path": "/workspace/repos"
+    "path": "/workspace/repos",
+    "include_projects": ["core/*"],
+    "exclude_projects": []
   },
   "content_filters": {
     "intent_file": "/workspace/repos/.gerrit-clone/filter-policy.json",

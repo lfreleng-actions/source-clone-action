@@ -36,6 +36,7 @@ from source_clone.github_transport import resolve_github_token
 from source_clone.logging import get_logger
 from source_clone.models import DiscoveryMethod, SourceType
 from source_clone.netrc import NetrcParseError
+from source_clone.project_list_file import ProjectListFileError, merge_project_lists
 
 if TYPE_CHECKING:
     import logging
@@ -316,8 +317,12 @@ def build_config(
             config_file=request.config_file,
             verbose=request.verbose,
             quiet=request.quiet,
-            include_projects=request.include_projects,
-            exclude_projects=request.exclude_projects,
+            include_projects=merge_project_lists(
+                request.include_projects, request.include_projects_files
+            ),
+            exclude_projects=merge_project_lists(
+                request.exclude_projects, request.exclude_projects_files
+            ),
             ssh_debug=request.ssh_debug,
             exit_on_error=request.exit_on_error,
             discovery_method=discovery_method,
@@ -330,7 +335,7 @@ def build_config(
             fetch_only=request.fetch_only,
             skip_conflicts=request.skip_conflicts,
         )
-    except ConfigurationError as e:
+    except (ConfigurationError, ProjectListFileError) as e:
         _report_configuration_error(session, e)
         raise typer.Exit(ExitCode.CONFIGURATION_ERROR) from e
     try:

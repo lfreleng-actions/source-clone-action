@@ -27,11 +27,6 @@ if TYPE_CHECKING:
 
     from tests.conftest import ActionCloneStep
 
-pytestmark = pytest.mark.xfail(
-    strict=True, reason="project list files are not implemented yet"
-)
-
-
 GITHUB_HOST = "github.com/example-org"
 
 LISTING = """\
@@ -195,6 +190,25 @@ def test_manifest_records_effective_lists(tmp_path: Path) -> None:
     assert recorded["exclude_projects"] == ["old-*"]
 
 
+def test_manifest_records_unset_lists_as_empty(tmp_path: Path) -> None:
+    """A config file's null filters serialise as empty lists."""
+    unset: Any = None
+    config = Config(
+        host=GITHUB_HOST,
+        source_type=SourceType.GITHUB,
+        github_org="example-org",
+        path=tmp_path,
+        include_projects=unset,
+        exclude_projects=unset,
+    )
+    batch = BatchResult(config=config, results=[], started_at=datetime.now(UTC))
+
+    recorded = batch.to_dict()["config"]
+
+    assert recorded["include_projects"] == []
+    assert recorded["exclude_projects"] == []
+
+
 class TestActionInputs:
     """include-projects-file and exclude-projects-file in the action.
 
@@ -250,3 +264,16 @@ class TestActionInputs:
         assert step.returncode != 0
         assert step.args is None
         assert "not found" in step.output
+
+    def test_the_cli_failing_on_an_empty_file_fails_the_step(
+        self, clone_step: ActionCloneStep
+    ) -> None:
+        """The step exits with the CLI's status, not a masked zero."""
+        (clone_step.workspace / "empty.txt").write_text("# nothing yet\n")
+        status = str(int(ExitCode.CONFIGURATION_ERROR))
+
+        step = clone_step.run(INPUT_INCLUDE_PROJECTS_FILE="empty.txt", STUB_EXIT=status)
+
+        assert step.args is not None
+        assert "--include-projects-file" in step.args
+        assert step.returncode == int(status), step.output

@@ -210,6 +210,8 @@ class BatchResult:
                 "branch": self.config.branch,
                 "strict_host_checking": self.config.strict_host_checking,
                 "path": str(self.config.path),
+                "include_projects": list(self.config.include_projects or []),
+                "exclude_projects": list(self.config.exclude_projects or []),
             },
             "results": [result.to_dict() for result in self.results],
         }
