@@ -524,8 +524,12 @@ runs:
         SSH_HOST="${INPUT_HOST}"
         SSH_HOST="${SSH_HOST%%/*}"
 
-        # Export secrets as env vars (keeps them off the cmd line)
+        # Export secrets as env vars (keeps them off the cmd line).
+        # The default route runs the latest source-clone release, and
+        # releases before SOURCE_CLONE_TOKEN read only
+        # GERRIT_CLONE_TOKEN, so set both.
         if [ -n "${INPUT_GITHUB_TOKEN}" ]; then
+          export SOURCE_CLONE_TOKEN="${INPUT_GITHUB_TOKEN}"
           export GERRIT_CLONE_TOKEN="${INPUT_GITHUB_TOKEN}"
         fi
         if [ -n "${INPUT_HTTP_PASSWORD}" ]; then
@@ -583,7 +587,7 @@ runs:
         if [ -n "${INPUT_GITHUB_ORG}" ]; then
           cmd+=(--github-org "${INPUT_GITHUB_ORG}")
         fi
-        # github-token passed via GERRIT_CLONE_TOKEN env var
+        # github-token passed via SOURCE_CLONE_TOKEN env var
         if [ "${INPUT_USE_GH_CLI}" = "true" ]; then
           cmd+=(--use-gh-cli)
         fi

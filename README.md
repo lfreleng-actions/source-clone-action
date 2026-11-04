@@ -170,7 +170,8 @@ source-clone clone --host gerrit.example.org:29418
 ```
 
 **GitHub sources** (these need a token, even for public repositories:
-set `GITHUB_TOKEN` or `GERRIT_CLONE_TOKEN`, or pass `--github-token`):
+pass `--github-token` or set `SOURCE_CLONE_TOKEN`, `GERRIT_CLONE_TOKEN`
+or `GITHUB_TOKEN`):
 
 ```bash
 # Clones to: ./github.com/myorg/repo-name
@@ -785,6 +786,20 @@ Options:
 - `--manifest-filename TEXT`: Output manifest filename (default: `mirror-manifest.json`)
 - `--verbose` / `-v`: Enable verbose/debug output
 - `--quiet` / `-q`: Suppress all output except errors
+
+### GitHub Token Precedence
+
+The clone command takes the first GitHub token it finds, in this order:
+
+1. `--github-token`
+2. `SOURCE_CLONE_TOKEN`
+3. `GERRIT_CLONE_TOKEN`
+4. `GITHUB_TOKEN`
+
+`GERRIT_CLONE_TOKEN` keeps working, but prefer `SOURCE_CLONE_TOKEN`.
+When GitHub rejects the token, the error names the source the token came
+from. When a stale `GERRIT_CLONE_TOKEN` hides a valid `GITHUB_TOKEN`,
+the error says so. The error never prints the token itself.
 
 ### Environment Variables
 

@@ -11,6 +11,7 @@ Unlike the rest of the package this module deliberately omits
 signature's annotations at runtime to derive each parameter type.
 """
 
+import os
 from pathlib import Path
 
 import typer
@@ -21,6 +22,7 @@ from source_clone.cli_clone_models import CloneRequest
 from source_clone.cli_clone_run import handle_crash, handle_interrupt, run_clone
 from source_clone.cli_session import CliSession
 from source_clone.concurrent_utils import handle_sigint_gracefully
+from source_clone.github_transport import GITHUB_TOKEN_OPTION_VARIABLES
 
 
 def clone(
@@ -193,11 +195,14 @@ def clone(
 def _github_token_source(ctx: typer.Context) -> str:
     """Name where the --github-token value came from, for logging.
 
-    The option also reads GERRIT_CLONE_TOKEN, so its value alone cannot
-    tell a typed token from one left in the environment; the parameter
-    source can.
+    The option also reads SOURCE_CLONE_TOKEN and GERRIT_CLONE_TOKEN, so
+    its value alone cannot tell a typed token from one left in the
+    environment; the parameter source can.  Click takes the first of
+    those variables that is set and non-empty, and so does this.
     """
     source = ctx.get_parameter_source("github_token")
     if source is not None and source.name == "ENVIRONMENT":
-        return "GERRIT_CLONE_TOKEN"
+        for variable in GITHUB_TOKEN_OPTION_VARIABLES:
+            if os.environ.get(variable):
+                return variable
     return "--github-token"

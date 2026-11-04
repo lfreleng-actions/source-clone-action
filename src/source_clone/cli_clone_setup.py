@@ -358,7 +358,8 @@ def _require_github_token(config: Config, token_source: str) -> None:
     GitHub discovery always calls the API with a token, and GitHub's
     GraphQL API answers no anonymous query, so without one no
     repository, public or private, can be listed.  Checked before
-    anything is printed, recorded or fetched.
+    anything is printed, recorded or fetched.  Records the token's
+    source on *config* so a later authentication error can name it.
 
     Args:
         config: Effective configuration
@@ -374,8 +375,9 @@ def _require_github_token(config: Config, token_source: str) -> None:
         raise ConfigurationError(
             "A GitHub source needs a GitHub token to list its "
             "repositories, public or private. Pass --github-token, or "
-            "set GERRIT_CLONE_TOKEN or GITHUB_TOKEN."
+            "set SOURCE_CLONE_TOKEN, GERRIT_CLONE_TOKEN or GITHUB_TOKEN."
         )
+    config.github_token_source = source
     logger.debug("GitHub token from: %s", source)
 
 

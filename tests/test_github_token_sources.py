@@ -29,11 +29,6 @@ if TYPE_CHECKING:
 
     from tests.conftest import ActionCloneStep
 
-pytestmark = pytest.mark.xfail(
-    strict=True, reason="SOURCE_CLONE_TOKEN is not implemented yet"
-)
-
-
 GITHUB_HOST = "github.com/example-org"
 TOKEN_VARIABLES = ("SOURCE_CLONE_TOKEN", "GERRIT_CLONE_TOKEN", "GITHUB_TOKEN")
 STALE = "stale-gerrit-clone-value"

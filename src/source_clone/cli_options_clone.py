@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import typer
 
+from source_clone.github_transport import GITHUB_TOKEN_OPTION_VARIABLES
 from source_clone.ssh_identity import parse_identity_file
 
 HOST = typer.Option(
@@ -32,9 +33,10 @@ GITHUB_TOKEN = typer.Option(
     "--github-token",
     help=(
         "GitHub personal access token; required for GitHub sources "
-        "(or set GERRIT_CLONE_TOKEN/GITHUB_TOKEN env var)"
+        "(or set SOURCE_CLONE_TOKEN, GERRIT_CLONE_TOKEN or GITHUB_TOKEN, "
+        "in that order of precedence)"
     ),
-    envvar="GERRIT_CLONE_TOKEN",
+    envvar=list(GITHUB_TOKEN_OPTION_VARIABLES),
 )
 GITHUB_ORG = typer.Option(
     None,

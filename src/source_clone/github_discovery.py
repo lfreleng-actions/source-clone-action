@@ -12,7 +12,11 @@ from __future__ import annotations
 from typing import Any
 
 from source_clone.github_api import GitHubAPI, GitHubAPIError, GitHubAuthError
-from source_clone.github_transport import github_api_url, resolve_github_token
+from source_clone.github_transport import (
+    describe_token_source,
+    github_api_url,
+    resolve_github_token,
+)
 from source_clone.logging import get_logger
 from source_clone.models import Config, Project, ProjectState, SourceType
 
@@ -48,9 +52,11 @@ def discover_github_repositories(
 
     logger.debug(f"Discovering repositories in GitHub org/user: {org_or_user}")
 
-    # The CLI logs where the token came from; here it is already resolved
-    # into config.github_token, so its origin would be mislabelled.
-    token, _source = resolve_github_token(config.github_token)
+    # config.github_token may have come from the environment through
+    # --github-token, so prefer the source the CLI recorded.
+    token, source = resolve_github_token(
+        config.github_token, config.github_token_source or "--github-token"
+    )
 
     try:
         # From the host, not config.base_url: --base-url and
@@ -81,8 +87,9 @@ def discover_github_repositories(
             return filtered_projects, stats
 
     except GitHubAuthError as e:
-        logger.error(f"GitHub authentication failed: {e}")
-        raise
+        message = f"{e} ({describe_token_source(source)})"
+        logger.error(f"GitHub authentication failed: {message}")
+        raise GitHubAuthError(message) from e
     except GitHubAPIError as e:
         logger.error(f"GitHub API error: {e}")
         raise

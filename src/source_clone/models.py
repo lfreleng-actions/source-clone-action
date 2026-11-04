@@ -88,6 +88,9 @@ class Config:
 
     # GitHub-specific settings
     github_token: str | None = None
+    # Where github_token came from (a flag or variable name, never the
+    # token), so an authentication error can say which one to fix
+    github_token_source: str | None = None
     github_org: str | None = None
     use_gh_cli: bool = False
 
