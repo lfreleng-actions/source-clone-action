@@ -397,6 +397,8 @@ class TestActionInputToCLIMapping:
         ("skip-archived", "skip-archived"),
         ("include-projects", "include-projects"),
         ("exclude-projects", "exclude-projects"),
+        ("include-projects-file", "include-projects-file"),
+        ("exclude-projects-file", "exclude-projects-file"),
         ("threads", "threads"),
         ("depth", "depth"),
         ("branch", "branch"),

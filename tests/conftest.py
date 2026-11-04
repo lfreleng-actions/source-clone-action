@@ -681,3 +681,103 @@ def git_repo_with_remote(
     run_git(["push", "-u", "origin", "main"], cwd=repo_path)
 
     return repo_path, bare_path
+
+
+# =============================================================================
+# The action's clone step, run against a stub CLI
+# =============================================================================
+
+ACTION_YAML = Path(__file__).parent.parent / "action.yaml"
+
+# Records the arguments, and the names of the token variables that are
+# set, never their values.
+_STUB_CLI = """#!/bin/bash
+printf '%s\\n' "$@" > "$STUB_ARGS"
+for name in SOURCE_CLONE_TOKEN GERRIT_CLONE_TOKEN GITHUB_TOKEN; do
+  if [ -n "${!name}" ]; then
+    printf '%s\\n' "$name"
+  fi
+done > "$STUB_TOKENS"
+"""
+
+# Inputs the step reads unconditionally, at their action.yaml defaults
+_STEP_DEFAULTS = {
+    "INPUT_HOST": "github.com/example-org",
+    "INPUT_USE_HTTPS": "true",
+    "INPUT_PORT": "29418",
+    "INPUT_MIRROR": "auto",
+    "INPUT_RETRY_FACTOR": "2.0",
+    "INPUT_RETRY_MAX_DELAY": "30.0",
+    "INPUT_MANIFEST_FILENAME": "clone-manifest.json",
+    "INPUT_LOG_LEVEL": "DEBUG",
+}
+
+
+class ClonedStep:
+    """Outcome of one run of the action's clone step."""
+
+    def __init__(self, result: subprocess.CompletedProcess[str], stub: Path) -> None:
+        self.returncode = result.returncode
+        self.output = result.stdout + result.stderr
+        args_file = stub / "args"
+        tokens_file = stub / "tokens"
+        # None when the step stopped before running the CLI
+        self.args = args_file.read_text().splitlines() if args_file.exists() else None
+        self.tokens = (
+            tokens_file.read_text().splitlines() if tokens_file.exists() else []
+        )
+
+
+class ActionCloneStep:
+    """action.yaml's clone step, run as the runner runs it, on a stub CLI."""
+
+    def __init__(self, tmp_path: Path) -> None:
+        import yaml  # noqa: PLC0415
+
+        steps = yaml.safe_load(ACTION_YAML.read_text())["runs"]["steps"]
+        self.script: str = next(s["run"] for s in steps if s.get("id") == "clone")
+        self.tmp_path = tmp_path
+        self.stub = tmp_path / "stub"
+        self.stub.mkdir()
+        cli = self.stub / "source-clone"
+        cli.write_text(_STUB_CLI)
+        cli.chmod(0o755)
+        self.workspace = tmp_path / "workspace"
+        self.workspace.mkdir()
+        # The step searches the output path for a manifest afterwards
+        self.output_path = tmp_path / "out"
+        self.output_path.mkdir()
+
+    def run(self, **inputs: str) -> ClonedStep:
+        """Run the step with ``INPUT_*`` overrides, in the workspace."""
+        for name in ("args", "tokens"):
+            (self.stub / name).unlink(missing_ok=True)
+        env = {
+            "PATH": f"{self.stub}{os.pathsep}{os.environ['PATH']}",
+            "HOME": str(self.tmp_path),
+            "GITHUB_WORKSPACE": str(self.workspace),
+            "GITHUB_OUTPUT": str(self.tmp_path / "github-output"),
+            "GITHUB_STEP_SUMMARY": str(self.tmp_path / "step-summary"),
+            "GITHUB_RUN_ID": "1",
+            "STUB_ARGS": str(self.stub / "args"),
+            "STUB_TOKENS": str(self.stub / "tokens"),
+            **_STEP_DEFAULTS,
+            "INPUT_OUTPUT_PATH": str(self.output_path),
+            **inputs,
+        }
+        result = subprocess.run(
+            ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", self.script],
+            cwd=self.workspace,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        return ClonedStep(result, self.stub)
+
+
+@pytest.fixture
+def clone_step(tmp_path: Path) -> ActionCloneStep:
+    """Return action.yaml's clone step, ready to run on a stub CLI."""
+    return ActionCloneStep(tmp_path)
