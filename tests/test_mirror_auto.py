@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 
 GITHUB_HOST = "github.com/example-org"
 GERRIT_HOST = "gerrit.example.org"
-_PENDING = pytest.mark.xfail(strict=True, reason="mirror: auto is not implemented yet")
 
 
 def _mirror_flags(args: list[str] | None) -> list[str]:
@@ -35,7 +34,6 @@ def _mirror_flags(args: list[str] | None) -> list[str]:
     return [arg for arg in args if arg in ("--mirror", "--no-mirror")]
 
 
-@_PENDING
 def test_action_defaults_to_auto() -> None:
     """New action commits resolve mirroring per source."""
     inputs = yaml.safe_load(ACTION_YAML.read_text())["inputs"]
@@ -46,25 +44,29 @@ def test_action_defaults_to_auto() -> None:
 @pytest.mark.parametrize(
     ("inputs", "expected"),
     [
-        pytest.param({"INPUT_HOST": GITHUB_HOST}, "--no-mirror", marks=_PENDING),
-        pytest.param(
-            {"INPUT_HOST": "https://github.com/example-org"},
-            "--no-mirror",
-            marks=_PENDING,
-        ),
+        ({"INPUT_HOST": GITHUB_HOST}, "--no-mirror"),
+        ({"INPUT_HOST": "https://github.com/example-org"}, "--no-mirror"),
         ({"INPUT_HOST": GERRIT_HOST}, "--mirror"),
         ({"INPUT_HOST": GERRIT_HOST, "INPUT_MIRROR": ""}, "--mirror"),
-        pytest.param(
-            {"INPUT_HOST": GITHUB_HOST, "INPUT_MIRROR": ""},
-            "--no-mirror",
-            marks=_PENDING,
-        ),
-        pytest.param(
+        ({"INPUT_HOST": GITHUB_HOST, "INPUT_MIRROR": ""}, "--no-mirror"),
+        (
             {"INPUT_HOST": "git.example.org/org", "INPUT_SOURCE_TYPE": "GitHub"},
             "--no-mirror",
-            marks=_PENDING,
         ),
         ({"INPUT_HOST": GITHUB_HOST, "INPUT_SOURCE_TYPE": "gerrit"}, "--mirror"),
+        (
+            {"INPUT_HOST": "git.example.org/org", "SOURCE_TYPE": "github"},
+            "--no-mirror",
+        ),
+        ({"INPUT_HOST": GITHUB_HOST, "SOURCE_TYPE": "Gerrit"}, "--mirror"),
+        (
+            {
+                "INPUT_HOST": GERRIT_HOST,
+                "INPUT_SOURCE_TYPE": "gerrit",
+                "SOURCE_TYPE": "github",
+            },
+            "--mirror",
+        ),
     ],
 )
 def test_auto_resolves_per_source(
@@ -92,7 +94,6 @@ def test_explicit_values_keep_their_meaning(
 
 
 @pytest.mark.parametrize(("option", "value"), [("depth", 1), ("branch", "main")])
-@_PENDING
 def test_cli_warning_names_no_mirror_for_github(
     tmp_path: Path, option: str, value: Any
 ) -> None:

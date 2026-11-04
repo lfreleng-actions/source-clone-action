@@ -227,7 +227,14 @@ This is ideal for:
 
 **Note**: The `--mirror` flag is incompatible with `--depth` and `--branch`.
 If you specify mirror mode along with these options, the tool ignores them with
-a warning.
+a warning. For a GitHub source, the warning names `--no-mirror`.
+
+The GitHub Action defaults its `mirror` input to `auto`: it mirrors Gerrit
+sources and makes working-tree clones of GitHub sources. It tells them
+apart as the CLI does: the `source-type` input, else the `SOURCE_TYPE`
+environment variable, else the host. Set `mirror: true`
+or `mirror: false` to choose a mode for every source. The CLI keeps mirror
+mode as its default.
 
 ### Refresh Command Examples
 
@@ -1323,6 +1330,7 @@ jobs:
 | `github-token`         | No       |                       | GitHub personal access token; required for GitHub sources, public or private                                                                                       |
 | `github-org`           | No       |                       | GitHub organization or user (auto-detected from host)                                                                                                              |
 | `use-gh-cli`           | No       | `false`               | Use GitHub CLI (`gh`) for cloning instead of git                                                                                                                   |
+| `mirror`               | No       | `auto`                | `auto` mirrors Gerrit sources and makes working-tree clones of GitHub sources; `true` always mirrors; `false` always makes working-tree clones                     |
 | `output-path`          | No       | `.`                   | Clone destination; an empty value or a spelling of `.` such as `./` creates `./{SERVER}/` or `./github.com/{ORG}/`; the tool uses any other value exactly as given |
 | `skip-archived`        | No       | `true`                | Skip archived and inactive repositories                                                                                                                            |
 | `include-projects`     | No       |                       | Restrict to specific project(s); comma/space-separated, wildcard and hierarchical patterns                                                                         |
