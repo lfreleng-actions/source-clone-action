@@ -11,6 +11,7 @@ Unlike the rest of the package this module deliberately omits
 signature's annotations at runtime to derive each parameter type.
 """
 
+import os
 from pathlib import Path
 
 import typer
@@ -21,6 +22,7 @@ from source_clone.cli_clone_models import CloneRequest
 from source_clone.cli_clone_run import handle_crash, handle_interrupt, run_clone
 from source_clone.cli_session import CliSession
 from source_clone.concurrent_utils import handle_sigint_gracefully
+from source_clone.github_transport import GITHUB_TOKEN_OPTION_VARIABLES
 
 
 def clone(
@@ -38,6 +40,8 @@ def clone(
     skip_archived: bool = opts.SKIP_ARCHIVED,
     include_projects: list[str] | None = opts.INCLUDE_PROJECTS,
     exclude_projects: list[str] | None = opts.EXCLUDE_PROJECTS,
+    include_projects_file: list[Path] | None = opts.INCLUDE_PROJECTS_FILE,
+    exclude_projects_file: list[Path] | None = opts.EXCLUDE_PROJECTS_FILE,
     ssh_debug: bool = opts.SSH_DEBUG,
     discovery_method: str | None = opts.DISCOVERY_METHOD,
     allow_nested_git: bool = opts.ALLOW_NESTED_GIT,
@@ -106,6 +110,9 @@ def clone(
         # Clone to specific directory with custom threads
         source-clone clone --host gerrit.example.org --output-path ./repos --threads 8
 
+        # Clone the GitHub repositories a file lists, as working trees
+        source-clone clone --host github.com/myorg --no-mirror --depth 1 --include-projects-file repos.txt
+
         # Clone with shallow depth and specific branch
         source-clone clone --host gerrit.example.org --no-mirror --depth 10 --branch main
 
@@ -138,6 +145,8 @@ def clone(
         skip_archived=skip_archived,
         include_projects=include_projects,
         exclude_projects=exclude_projects,
+        include_projects_files=include_projects_file,
+        exclude_projects_files=exclude_projects_file,
         ssh_debug=ssh_debug,
         discovery_method=discovery_method,
         allow_nested_git=allow_nested_git,
@@ -193,11 +202,14 @@ def clone(
 def _github_token_source(ctx: typer.Context) -> str:
     """Name where the --github-token value came from, for logging.
 
-    The option also reads GERRIT_CLONE_TOKEN, so its value alone cannot
-    tell a typed token from one left in the environment; the parameter
-    source can.
+    The option also reads SOURCE_CLONE_TOKEN and GERRIT_CLONE_TOKEN, so
+    its value alone cannot tell a typed token from one left in the
+    environment; the parameter source can.  Click takes the first of
+    those variables that is set and non-empty, and so does this.
     """
     source = ctx.get_parameter_source("github_token")
     if source is not None and source.name == "ENVIRONMENT":
-        return "GERRIT_CLONE_TOKEN"
+        for variable in GITHUB_TOKEN_OPTION_VARIABLES:
+            if os.environ.get(variable):
+                return variable
     return "--github-token"

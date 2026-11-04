@@ -141,6 +141,13 @@ def _validate_clone_limits(config: Config) -> None:
         raise ValueError("clone_timeout must be positive")
 
 
+# A GitHub source is usually wanted as working trees for tools to read,
+# so its warning names the option that keeps --depth and --branch.
+_NO_MIRROR_HINT = {
+    SourceType.GITHUB: " Pass --no-mirror for working-tree clones that honour it.",
+}
+
+
 def _apply_mirror_overrides(config: Config) -> None:
     """Drop options that mirror mode cannot honour, warning as they are cleared."""
     if not config.mirror:
@@ -155,6 +162,7 @@ def _apply_mirror_overrides(config: Config) -> None:
         logger.warning(
             "mirror mode is incompatible with --depth option. "
             "Ignoring --depth and using full clone."
+            + _NO_MIRROR_HINT.get(config.source_type, "")
         )
         object.__setattr__(config, "depth", None)
 
@@ -165,6 +173,7 @@ def _apply_mirror_overrides(config: Config) -> None:
         logger.warning(
             "mirror mode is incompatible with --branch option. "
             "Ignoring --branch and cloning all refs."
+            + _NO_MIRROR_HINT.get(config.source_type, "")
         )
         object.__setattr__(config, "branch", None)
 

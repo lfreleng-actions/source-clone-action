@@ -52,7 +52,7 @@ def _succeed(_config: Config) -> MagicMock:
 @pytest.fixture
 def no_token(monkeypatch: pytest.MonkeyPatch) -> None:
     """Remove every environment variable a GitHub token comes from."""
-    for name in ("GITHUB_TOKEN", "GERRIT_CLONE_TOKEN"):
+    for name in ("GITHUB_TOKEN", "GERRIT_CLONE_TOKEN", "SOURCE_CLONE_TOKEN"):
         monkeypatch.delenv(name, raising=False)
 
 

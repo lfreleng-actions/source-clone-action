@@ -31,8 +31,13 @@ logger = get_logger(__name__)
 GITHUB_API_URL = "https://api.github.com"
 
 # Where a GitHub token comes from, highest precedence first after an
-# explicit --github-token.
-GITHUB_TOKEN_VARIABLES = ("GERRIT_CLONE_TOKEN", "GITHUB_TOKEN")
+# explicit --github-token.  GERRIT_CLONE_TOKEN stays accepted because
+# earlier action.yaml revisions export it.
+GITHUB_TOKEN_VARIABLES = ("SOURCE_CLONE_TOKEN", "GERRIT_CLONE_TOKEN", "GITHUB_TOKEN")
+
+# The variables the --github-token option reads itself, in Click's
+# first-set-wins order.
+GITHUB_TOKEN_OPTION_VARIABLES = GITHUB_TOKEN_VARIABLES[:2]
 
 
 def resolve_github_token(
@@ -40,15 +45,15 @@ def resolve_github_token(
 ) -> tuple[str | None, str | None]:
     """Return the GitHub token to use and where it came from.
 
-    Precedence: an explicit token, then GERRIT_CLONE_TOKEN, then
-    GITHUB_TOKEN.  The source is a name safe to log; the token never
-    is.
+    Precedence: an explicit token, then SOURCE_CLONE_TOKEN, then
+    GERRIT_CLONE_TOKEN, then GITHUB_TOKEN.  The source is a name safe
+    to log; the token never is.
 
     Args:
         explicit: Token given on the command line or in configuration
         explicit_source: Where *explicit* came from.  ``--github-token``
-            also reads GERRIT_CLONE_TOKEN, so the CLI passes the
-            source it observed.
+            also reads SOURCE_CLONE_TOKEN and GERRIT_CLONE_TOKEN, so
+            the CLI passes the source it observed.
 
     Returns:
         Tuple of (token, source name), or (None, None) when no source
@@ -60,6 +65,31 @@ def resolve_github_token(
         if token := os.getenv(variable):
             return token, variable
     return None, None
+
+
+def describe_token_source(source: str | None) -> str:
+    """Say where a rejected token came from, for an error message.
+
+    A GERRIT_CLONE_TOKEN left over from Gerrit use outranks a valid
+    GITHUB_TOKEN, so that case says both are set.  Only variable names
+    appear; never a token.
+
+    Args:
+        source: Source name from :func:`resolve_github_token`
+
+    Returns:
+        Text naming the token's source
+    """
+    if source is None:
+        return "no GitHub token was found"
+    text = f"token from {source}"
+    if source == "GERRIT_CLONE_TOKEN" and os.getenv("GITHUB_TOKEN"):
+        text += (
+            "; GITHUB_TOKEN is also set but GERRIT_CLONE_TOKEN takes "
+            "precedence: unset GERRIT_CLONE_TOKEN if it is stale, or set "
+            "SOURCE_CLONE_TOKEN"
+        )
+    return text
 
 
 def github_api_url(host: str) -> str:

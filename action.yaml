@@ -69,6 +69,18 @@ inputs:
       Supports shell-style wildcards (*, ?, [seq]), hierarchical matching,
       and comma or space-separated lists.
     required: false
+  include-projects-file:
+    description: >-
+      File listing projects to clone, relative to the workspace: names or
+      globs separated by commas, spaces or new lines, with '#' starting a
+      comment. Merged with include-projects. A file naming nothing, or
+      resolving outside the workspace, is an error.
+    required: false
+  exclude-projects-file:
+    description: >-
+      File listing projects to exclude, in the include-projects-file
+      format. Merged with exclude-projects.
+    required: false
   ssh-debug:
     description: >-
       Enable verbose SSH (-vvv) for troubleshooting authentication
@@ -133,11 +145,13 @@ inputs:
     required: false
   mirror:
     description: >-
-      Use git clone --mirror for complete repository metadata (all refs,
-      tags, branches). Creates bare repository. Incompatible with depth
-      and branch options.
+      "true" uses git clone --mirror for complete repository metadata
+      (all refs, tags, branches) in a bare repository, which ignores the
+      depth and branch options; "false" clones working trees. "auto"
+      (the default) mirrors Gerrit sources and clones GitHub sources as
+      working trees.
     required: false
-    default: "true"
+    default: "auto"
   set-default-branch:
     description: >-
       After pushing to GitHub, set the default branch to match the HEAD
@@ -448,6 +462,8 @@ runs:
       env:
         INPUT_INCLUDE_PROJECTS: ${{ inputs.include-projects }}
         INPUT_EXCLUDE_PROJECTS: ${{ inputs.exclude-projects }}
+        INPUT_INCLUDE_PROJECTS_FILE: ${{ inputs.include-projects-file }}
+        INPUT_EXCLUDE_PROJECTS_FILE: ${{ inputs.exclude-projects-file }}
         INPUT_HOST: ${{ inputs.host }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         INPUT_HTTP_PASSWORD: ${{ inputs.http-password }}
@@ -524,8 +540,12 @@ runs:
         SSH_HOST="${INPUT_HOST}"
         SSH_HOST="${SSH_HOST%%/*}"
 
-        # Export secrets as env vars (keeps them off the cmd line)
+        # Export secrets as env vars (keeps them off the cmd line).
+        # The default route runs the latest source-clone release, and
+        # releases before SOURCE_CLONE_TOKEN read only
+        # GERRIT_CLONE_TOKEN, so set both.
         if [ -n "${INPUT_GITHUB_TOKEN}" ]; then
+          export SOURCE_CLONE_TOKEN="${INPUT_GITHUB_TOKEN}"
           export GERRIT_CLONE_TOKEN="${INPUT_GITHUB_TOKEN}"
         fi
         if [ -n "${INPUT_HTTP_PASSWORD}" ]; then
@@ -583,7 +603,7 @@ runs:
         if [ -n "${INPUT_GITHUB_ORG}" ]; then
           cmd+=(--github-org "${INPUT_GITHUB_ORG}")
         fi
-        # github-token passed via GERRIT_CLONE_TOKEN env var
+        # github-token passed via SOURCE_CLONE_TOKEN env var
         if [ "${INPUT_USE_GH_CLI}" = "true" ]; then
           cmd+=(--use-gh-cli)
         fi
@@ -625,7 +645,30 @@ runs:
           cmd+=(--branch "${INPUT_BRANCH}")
         fi
 
-        if [ "${INPUT_MIRROR}" = "false" ]; then
+        # "auto" mirrors a Gerrit source, for backup and migration, and
+        # clones a GitHub source as working trees, for tools that read
+        # files. The source is detected as the CLI detects it: the
+        # source-type input, else the SOURCE_TYPE variable, else the host.
+        mirror="${INPUT_MIRROR:-auto}"
+        if [ "$mirror" = "auto" ]; then
+          source_type="${INPUT_SOURCE_TYPE:-${SOURCE_TYPE:-}}"
+          source_type="${source_type,,}"
+          if [ -z "$source_type" ]; then
+            case "${INPUT_HOST,,}" in
+              *github.com*|*github.io*|*ghe.*|*github.*)
+                source_type="github" ;;
+              *)
+                source_type="gerrit" ;;
+            esac
+          fi
+          if [ "$source_type" = "github" ]; then
+            mirror="false"
+          else
+            mirror="true"
+          fi
+          echo "mirror: auto resolves to $mirror for a $source_type source"
+        fi
+        if [ "$mirror" = "false" ]; then
           cmd+=(--no-mirror)
         else
           cmd+=(--mirror)
@@ -724,6 +767,37 @@ runs:
           done
         fi
 
+        # Project list files: relative to the workspace, and refused
+        # when they resolve outside it, through a symlink or "..".
+        workspace=$(realpath -- "${GITHUB_WORKSPACE:-$PWD}")
+        for kind in include exclude; do
+          if [ "$kind" = "include" ]; then
+            list_file="${INPUT_INCLUDE_PROJECTS_FILE}"
+          else
+            list_file="${INPUT_EXCLUDE_PROJECTS_FILE}"
+          fi
+          if [ -z "$list_file" ]; then
+            continue
+          fi
+          case "$list_file" in
+            /*) candidate="$list_file" ;;
+            *) candidate="$workspace/$list_file" ;;
+          esac
+          if ! resolved=$(realpath -e -- "$candidate" 2>/dev/null); then
+            echo "::error::${kind}-projects-file not found: $list_file"
+            exit 1
+          fi
+          case "$resolved" in
+            "$workspace"/*) ;;
+            *)
+              echo "::error::${kind}-projects-file is outside the" \
+                "workspace: $list_file"
+              exit 1
+              ;;
+          esac
+          cmd+=("--${kind}-projects-file" "$resolved")
+        done
+
         if [ "${INPUT_SSH_DEBUG}" = "true" ]; then
           cmd+=(--ssh-debug)
         fi
@@ -795,11 +869,10 @@ runs:
 
         # Execute and capture exit code.
         # GitHub Actions runs bash with -e, so a bare invocation
-        # would terminate the script before exit_code is set.
+        # would terminate the script before exit_code is set. Inside
+        # "if ! cmd", $? holds the negated status (0), so use "||".
         exit_code=0
-        if ! "${cmd[@]}"; then
-          exit_code=$?
-        fi
+        "${cmd[@]}" || exit_code=$?
 
         # Set outputs from manifest file
         # The CLI auto-adjusts the output path
