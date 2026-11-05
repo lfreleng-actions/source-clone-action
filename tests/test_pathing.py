@@ -376,13 +376,10 @@ class TestAtomicClonePath:
         # __exit__ should complete without error
 
     @patch("source_clone.pathing.shutil.rmtree")
-    @patch("os.path.exists")
-    def test_atomic_clone_path_successful_completion(self, mock_exists, mock_rmtree):
+    def test_atomic_clone_path_successful_completion(self, mock_rmtree):
         """Test successful atomic operation."""
         with tempfile.TemporaryDirectory() as temp_dir:
             target_path = Path(temp_dir) / "project"
-
-            mock_exists.return_value = True
 
             with AtomicClonePath(target_path) as atomic:
                 # Simulate creating content in temp directory
