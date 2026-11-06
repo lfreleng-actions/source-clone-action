@@ -638,10 +638,6 @@ def test_ci_runs_source_clone() -> None:
 GITHUB = "github.com/example-org"
 GERRIT = "gerrit.example.org"
 
-_ACTION_MIRROR_DEFAULT = pytest.mark.xfail(
-    strict=True, reason="the action still mirrors Gerrit sources by default"
-)
-
 
 class TestActionMirrorInput:
     """The action makes working copies unless ``mirror`` is ``true``.
@@ -655,7 +651,6 @@ class TestActionMirrorInput:
         assert args is not None, "the step never ran the CLI"
         return [arg for arg in args if arg in ("--mirror", "--no-mirror")]
 
-    @_ACTION_MIRROR_DEFAULT
     def test_input_defaults_to_false(self, action_yaml: dict[str, Any]) -> None:
         assert action_yaml["inputs"]["mirror"]["default"] == "false"
 
@@ -675,9 +670,9 @@ class TestActionMirrorInput:
             (GITHUB, "false"),
             (GERRIT, "false"),
             (GITHUB, ""),
-            pytest.param(GERRIT, "", marks=_ACTION_MIRROR_DEFAULT),
-            pytest.param(GITHUB, "yes", marks=_ACTION_MIRROR_DEFAULT),
-            pytest.param(GERRIT, "yes", marks=_ACTION_MIRROR_DEFAULT),
+            (GERRIT, ""),
+            (GITHUB, "yes"),
+            (GERRIT, "yes"),
         ],
     )
     def test_anything_else_passes_no_mirror(
@@ -688,9 +683,7 @@ class TestActionMirrorInput:
         assert step.returncode == 0, step.output
         assert self._mirror_flags(step.args) == ["--no-mirror"]
 
-    @pytest.mark.parametrize(
-        "host", [GITHUB, pytest.param(GERRIT, marks=_ACTION_MIRROR_DEFAULT)]
-    )
+    @pytest.mark.parametrize("host", [GITHUB, GERRIT])
     def test_omitted_input_makes_working_copies(
         self,
         clone_step: ActionCloneStep,

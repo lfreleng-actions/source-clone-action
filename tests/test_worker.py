@@ -89,8 +89,8 @@ class TestCloneWorker:
         assert "1h" in worker._format_duration(3665.0)
 
     def test_build_clone_command_with_mirror(self) -> None:
-        """Test that clone command includes --mirror flag by default."""
-        config = Config(host="gerrit.example.org")
+        """Test that clone command includes --mirror flag in mirror mode."""
+        config = Config(host="gerrit.example.org", mirror=True)
         worker = CloneWorker(config)
         project = Project("test-project", ProjectState.ACTIVE)
         target_path = Path("/tmp/test-project")

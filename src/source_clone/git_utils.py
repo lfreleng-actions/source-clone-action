@@ -47,6 +47,28 @@ def is_git_repository(repo_path: Path) -> bool:
     if git_dir.exists():
         return True
 
+    return is_bare_repository(repo_path)
+
+
+def is_bare_repository(repo_path: Path) -> bool:
+    """Check if a path is a bare git repository.
+
+    A directory holding a ``.git`` entry is a working copy, never bare.
+
+    Args:
+        repo_path: Path to check
+
+    Returns:
+        True if the path is a bare git repository, False otherwise
+
+    Raises:
+        ProcessAbandonedError: If the calling thread's batch has been
+            abandoned, or the process is terminating, when the git
+            fallback is needed.
+    """
+    if not repo_path.is_dir() or (repo_path / ".git").exists():
+        return False
+
     # Check for bare repository filesystem markers first (cheap operation)
     # A bare repo typically has these at the root level
     bare_markers = ["HEAD", "objects", "refs", "config"]

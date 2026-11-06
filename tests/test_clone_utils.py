@@ -20,8 +20,8 @@ class TestBuildBaseCloneCommand:
     """Test build_base_clone_command function."""
 
     def test_basic_clone_with_mirror(self) -> None:
-        """Test basic clone command with mirror mode (default)."""
-        config = Config(host="gerrit.example.org")
+        """Test basic clone command with mirror mode."""
+        config = Config(host="gerrit.example.org", mirror=True)
         clone_url = "ssh://gerrit.example.org:29418/test-project"
         target_path = Path("/tmp/repos/test-project")
 

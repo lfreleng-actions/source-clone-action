@@ -34,11 +34,6 @@ if TYPE_CHECKING:
 GERRIT_HOST = "gerrit.example.org"
 GITHUB_HOST = "github.com/example-org"
 
-#: Marks a test that holds once clone makes working copies by default.
-working_copy_default = pytest.mark.xfail(
-    strict=True, reason="clone still makes bare mirrors by default"
-)
-
 #: The phrase the existing-mirror notice is counted by.
 NOTICE = "existing bare mirror(s)"
 
@@ -77,17 +72,14 @@ def _is_bare(repo: Path) -> bool:
 
 
 class TestDefault:
-    @working_copy_default
     def test_config_defaults_to_working_copies(self) -> None:
         assert Config(host=GERRIT_HOST).mirror is False
 
-    @working_copy_default
     def test_loaded_config_defaults_to_working_copies(self) -> None:
         assert ConfigManager().load_config(host=GERRIT_HOST).mirror is False
 
 
 class TestGitCommand:
-    @working_copy_default
     def test_default_has_no_mirror(self, tmp_path: Path) -> None:
         cmd = build_base_clone_command(
             "ssh://x/p", tmp_path / "p", Config(host=GERRIT_HOST)
@@ -95,7 +87,6 @@ class TestGitCommand:
 
         assert "--mirror" not in cmd
 
-    @working_copy_default
     def test_default_keeps_depth_and_branch(self, tmp_path: Path) -> None:
         config = Config(host=GERRIT_HOST, depth=10, branch="main")
 
@@ -115,7 +106,6 @@ class TestGitCommand:
 
 
 class TestGhCommand:
-    @working_copy_default
     def test_default_has_no_mirror(self, tmp_path: Path) -> None:
         cmd = _build_gh_clone_command(
             _github_project(), _github_config(tmp_path), tmp_path / "repo"
@@ -123,7 +113,6 @@ class TestGhCommand:
 
         assert "--mirror" not in cmd
 
-    @working_copy_default
     def test_default_keeps_depth_and_branch(self, tmp_path: Path) -> None:
         config = _github_config(tmp_path, depth=10, branch="main")
 
@@ -140,7 +129,6 @@ class TestGhCommand:
 
 
 class TestDepthAndBranch:
-    @working_copy_default
     def test_default_keeps_them_without_a_warning(self) -> None:
         logger = MagicMock()
         with patch("source_clone.logging.get_logger", return_value=logger):
@@ -190,7 +178,6 @@ class TestMirrorCommand:
 
 
 class TestHelp:
-    @working_copy_default
     def test_help_describes_the_default(self) -> None:
         result = CliRunner().invoke(app, ["clone", "--help"])
 
@@ -245,7 +232,6 @@ def _clone(
 
 
 class TestEndToEnd:
-    @working_copy_default
     def test_default_clone_is_a_working_copy(
         self, upstream: Path, tmp_path: Path
     ) -> None:
@@ -300,7 +286,6 @@ class TestMixedTree:
         _git("clone", "-q", "--mirror", upstream.as_uri(), str(tree / "old"))
         return tree
 
-    @working_copy_default
     def test_mirror_is_refreshed_and_new_projects_are_working_copies(
         self, upstream: Path, tree: Path
     ) -> None:
@@ -321,7 +306,6 @@ class TestMixedTree:
         logged = [str(c.args[0]) for c in logger.info.call_args_list]
         assert [m for m in logged if NOTICE in m]
 
-    @working_copy_default
     def test_verbose_prints_the_notice_once_and_logs_it(
         self, upstream: Path, tree: Path, tmp_path: Path
     ) -> None:
@@ -341,7 +325,6 @@ class TestMixedTree:
         assert _flat(result.output).count(NOTICE) == 1
         assert log_file.read_text(encoding="utf-8").count(NOTICE) == 1
 
-    @working_copy_default
     @pytest.mark.parametrize("options", [(), ("--no-refresh",)])
     def test_notice_does_not_claim_a_refresh(
         self, upstream: Path, tree: Path, options: tuple[str, ...]

@@ -84,9 +84,9 @@ class RepositoryDiscoveryMixin:
     def discover_local_repositories(self, base_path: Path) -> list[Path]:
         """Discover all Git repositories under base_path.
 
-        Both working copies and bare repositories are found.  Clones are
-        bare mirrors by default, and a mirror has no ``.git`` directory
-        to recognise it by.
+        Both working copies and bare repositories are found.  A
+        ``--mirror`` clone is a bare mirror, and a mirror has no ``.git``
+        directory to recognise it by.
 
         Args:
             base_path: Base directory to search

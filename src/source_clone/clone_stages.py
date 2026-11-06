@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from rich.console import Console
 
-from source_clone.git_utils import is_git_repository
+from source_clone.git_utils import is_bare_repository, is_git_repository
 from source_clone.logging import get_logger, suppress_console_logging
 from source_clone.models import SourceType
 from source_clone.rich_status import (
@@ -67,6 +67,41 @@ def partition_existing_repos(
             repos_needing_clone.append(project)
 
     return repos_needing_clone, repos_to_refresh
+
+
+def announce_existing_bare_mirrors(
+    config: Config, repos_to_refresh: list[Project]
+) -> None:
+    """Say once that existing bare mirrors stay mirrors in working-copy mode.
+
+    ``clone`` makes working copies by default but never converts a
+    repository already on disk, so a tree an earlier release mirrored
+    keeps its bare mirrors until they are deleted and cloned again.
+    """
+    if config.mirror:
+        return
+
+    count = sum(
+        1
+        for project in repos_to_refresh
+        if is_bare_repository(config.path / project.filesystem_path)
+    )
+    if not count:
+        return
+
+    # Runs before any refresh, which may be skipped or fail: claim none
+    message = (
+        f"Found {count} existing bare mirror(s) under {config.path}: kept "
+        "as mirrors, not converted to working copies. Pass --mirror to keep "
+        "the tree mirrored, or delete them and clone again to get working "
+        "copies."
+    )
+    # Log to the file only: --verbose would otherwise echo it to the console
+    with suppress_console_logging():
+        logger.info(message)
+    if not config.quiet:
+        # markup=False: the output path may hold brackets Rich would parse
+        Console(stderr=True).print(f"⚠️  {message}", style="yellow", markup=False)
 
 
 def announce_clone_start(

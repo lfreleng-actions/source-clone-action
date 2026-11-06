@@ -82,7 +82,7 @@ class RepositoryStateMixin(GitEnvironmentMixin):
         return is_git_repository(path)
 
     def _is_bare_repository(self, repo_path: Path) -> bool:
-        """Whether *repo_path* is a bare repository, as a default clone is.
+        """Whether *repo_path* is a bare repository, as a ``--mirror`` clone is.
 
         A bare repository has no working tree, so none of the branch,
         upstream or stash handling applies to it.

@@ -125,7 +125,6 @@ class TestConfigManager:
         assert config.retry_policy.max_attempts == 4
         assert config.retry_policy.base_delay == 3.0
 
-    @pytest.mark.xfail(strict=True, reason="clone still mirrors by default")
     def test_load_config_mirror_default_false(self):
         """Test that mirror defaults to False: clone makes working copies."""
         manager = ConfigManager()

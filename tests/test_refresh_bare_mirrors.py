@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 The Linux Foundation
 
-"""Refreshing default clones, which are bare mirrors.
+"""Refreshing ``--mirror`` clones, which are bare mirrors.
 
-Clones default to ``git clone --mirror``, so a refresh has no ``.git``
-directory to find them by and no checked-out branch to pull.  These run
+A ``git clone --mirror`` clone has no ``.git`` directory for a refresh
+to find it by and no checked-out branch to pull.  These run
 real git against local upstreams, end to end: discovery, the refresh
 itself -- through ``refresh`` and through re-running ``clone`` -- and
 what the command reports afterwards.
@@ -96,7 +96,7 @@ def _has_ref(repo: Path, ref: str) -> bool:
 
 @pytest.fixture
 def tree(tmp_path: Path) -> Path:
-    """A default clone tree: a mirror, with another mirror nested inside it.
+    """A ``--mirror`` clone tree: a mirror, with another mirror nested inside.
 
     Nesting is how Gerrit hierarchies land on disk -- ``com/parent/child``
     is cloned inside the ``com/parent`` mirror -- so discovery has to

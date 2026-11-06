@@ -706,7 +706,7 @@ _STEP_DEFAULTS = {
     "INPUT_HOST": "github.com/example-org",
     "INPUT_USE_HTTPS": "true",
     "INPUT_PORT": "29418",
-    "INPUT_MIRROR": "auto",
+    "INPUT_MIRROR": "false",
     "INPUT_RETRY_FACTOR": "2.0",
     "INPUT_RETRY_MAX_DELAY": "30.0",
     "INPUT_MANIFEST_FILENAME": "clone-manifest.json",

@@ -7,10 +7,11 @@
 
 ## Overview
 
-This document describes the implementation of `--mirror` mode as the default
-behavior for the source-clone-action tool. The `--mirror` flag creates bare
-Git repositories with complete metadata, including all branches, tags, refs,
-and notes.
+This document describes the implementation of `--mirror` mode in the
+source-clone-action tool. The `--mirror` flag creates bare Git repositories
+with complete metadata, including all branches, tags, refs, and notes.
+Mirror mode is opt-in for `clone`, which makes working copies by default,
+and always used by the `mirror` command.
 
 ## Implementation Date
 
@@ -18,10 +19,11 @@ and notes.
 
 ## Motivation
 
-We needed to ensure that by default, all content cloned by the
-source-clone-action and source-clone Python CLI tool contains complete
-metadata from remote repositories. We do this by making Git's `--mirror`
-option the default for all clone operations.
+Backups and migrations need complete metadata from remote repositories,
+which Git's `--mirror` option provides. Release 4.0 made it opt-in for
+`clone`: most people who clone a server want working copies they can `cd`
+into, and mirroring to GitHub has its own command, `mirror`, which keeps
+using bare mirrors because it pushes with `git push --mirror`.
 
 ## Changes Made
 
@@ -29,8 +31,8 @@ option the default for all clone operations.
 
 **Added Field:**
 
-- `mirror: bool = True` - New field in the `Config` class with default
-  value `True`
+- `mirror: bool = False` - Field in the `Config` class; `True` selects
+  mirror mode
 
 **Validation Logic:**
 
@@ -47,9 +49,9 @@ option the default for all clone operations.
 
 **Behavior:**
 
-- **Mirror Mode (default):** Adds `--mirror` flag to git clone command
-- **Non-Mirror Mode:** Uses original behavior with `--no-hardlinks`,
-  `--quiet`, optional `--depth`, and optional `--branch`
+- **Mirror Mode:** Adds `--mirror` flag to git clone command
+- **Non-Mirror Mode (default):** Uses `--no-hardlinks`, `--quiet`,
+  optional `--depth`, and optional `--branch`
 
 ### 3. GitHub Worker Changes (`src/source_clone/github_worker.py`)
 
@@ -70,9 +72,10 @@ mirror: bool | None = typer.Option(
     None,
     "--mirror/--no-mirror",
     help=(
-        "Use git clone --mirror for complete repository metadata "
-        "(all refs, tags, branches). Creates bare repository. "
-        "Incompatible with --depth and --branch."
+        "clone makes working copies by default. --mirror makes bare mirrors "
+        "instead (git clone --mirror): every ref, tag and branch, with no "
+        "working tree, for backups or later mirroring. Incompatible with "
+        "--depth and --branch."
     ),
     envvar="GERRIT_MIRROR",
 )
@@ -81,7 +84,7 @@ mirror: bool | None = typer.Option(
 **Tri-State Behavior:**
 
 - `None` (default): Uses the value from config file/environment variables,
-  or falls back to `Config.mirror=True` default
+  or falls back to the `Config.mirror=False` default (working copies)
 - `--mirror`: Explicitly enables mirror mode
   (overrides config file/environment)
 - `--no-mirror`: Explicitly disables mirror mode
@@ -106,8 +109,9 @@ mirror: bool = typer.Option(
 )
 ```
 
-Note: The `mirror` command defaults to `True` directly since it focuses
-specifically on mirror operations.
+Note: The `mirror` command defaults to `True` directly, and builds its
+`Config` with that value, since it pushes with `git push --mirror`. It does
+not inherit the `Config.mirror=False` default that `clone` uses.
 
 ### 5. Configuration Management Changes (`src/source_clone/config.py`)
 
@@ -127,23 +131,29 @@ specifically on mirror operations.
 ```yaml
 mirror:
   description: >-
-    Use git clone --mirror for complete repository metadata...
+    The action clones working copies by default ("false"). "true"
+    clones bare mirrors with git clone --mirror...
   required: false
-  default: "true"
+  default: "false"
 ```
+
+The clone step passes `--mirror` for `true`, and `--no-mirror` otherwise,
+always one or the other so the result never depends on the CLI release
+`uvx` resolves. `auto` mirrors Gerrit sources and makes working copies of
+GitHub sources.
 
 ### 7. Documentation Changes (`README.md`)
 
-- Added "Complete Metadata Cloning" to features list
-- Updated clone examples to show `--no-mirror` usage
-- Added new section "Understanding Mirror Mode"
+- Features list: working copies by default, full bare mirrors via `--mirror`
+- Clone examples: `--depth`/`--branch` without flags, and a `--mirror` backup
+- Section "Working Copies and Mirrors", and "Upgrading to 4.0"
 - Updated GitHub Action examples
 
 ### 8. Test Coverage
 
 **Config Tests (`tests/test_config.py`):**
 
-- `test_load_config_mirror_default_true`
+- `test_load_config_mirror_default_false`
 - `test_load_config_mirror_explicit_false`
 - `test_load_config_mirror_incompatible_with_depth`
 - `test_load_config_mirror_incompatible_with_branch`
@@ -156,15 +166,23 @@ mirror:
 - `test_build_clone_command_with_depth_no_mirror`
 - `test_build_clone_command_with_branch_no_mirror`
 
+**Default and Compatibility Tests
+(`tests/test_clone_default_working_copy.py`):**
+
+- The working-copy default, end to end and in the git and gh commands
+- Each route to mirror mode: `--mirror`, `GERRIT_MIRROR=true`, config file
+- The `mirror` command still cloning bare mirrors
+- An existing bare mirror refreshed as a mirror, with one notice
+
 ## Usage Examples
 
 ### CLI Usage
 
-**Default (Mirror Mode - no flag specified):**
+**Default (Working Copies - no flag specified):**
 
 ```bash
 source-clone clone --host gerrit.example.org
-# Creates bare repos with all metadata (uses Config.mirror=True default)
+# Creates working copies (uses Config.mirror=False default)
 ```
 
 **Explicit Mirror Mode:**
@@ -178,7 +196,7 @@ source-clone clone --host gerrit.example.org --mirror
 
 ```bash
 source-clone clone --host gerrit.example.org --no-mirror
-# Creates standard repos with working directory (overrides default/config)
+# Creates working copies even when config or environment selects mirror mode
 ```
 
 **With Config File:**
@@ -206,13 +224,13 @@ source-clone clone --host gerrit.example.org --mirror
 
 ### GitHub Actions Usage
 
-**Default (Mirror Mode - no input specified):**
+**Default (Working Copies - no input specified):**
 
 ```yaml
 - uses: lfreleng-actions/source-clone-action@v1
   with:
     host: gerrit.example.org
-    # No mirror input = uses Config.mirror=True default
+    # No mirror input = "false", which passes --no-mirror
 ```
 
 **Explicit Mirror Mode:**
@@ -261,30 +279,31 @@ The mirror option follows standard configuration precedence:
 1. **CLI flags** (highest): `--mirror` or `--no-mirror`
 2. **Environment variables**: `GERRIT_MIRROR=true` or `GERRIT_MIRROR=false`
 3. **Config file**: `mirror: true` or `mirror: false`
-4. **Default** (lowest): `Config.mirror=True`
+4. **Default** (lowest): `Config.mirror=False`
 
 This allows users to:
 
 - Set defaults in config files or environment variables
 - Override on a per-command basis with CLI flags
-- Use the sensible default (mirror mode) when they do not specify
-  a preference
+- Get working copies when they do not specify a preference
 
 ### Backward Compatibility
 
-This is a **breaking change**. Users who need the old behavior must now
-explicitly use `--no-mirror` or set it in their config file/environment.
+Release 4.0 made working copies the `clone` default, a **breaking change**
+for anyone relying on bare mirrors without asking for them. Every name
+keeps its meaning: `--mirror/--no-mirror`, `GERRIT_MIRROR`, the `mirror`
+config-file key and the Action's `mirror` input. Older pinned Action
+commits pass `--mirror` or `--no-mirror` explicitly, so they keep getting
+what they asked for.
 
 **Migration Path:**
 
-- Users who want working directories: Add `--no-mirror` flag or set
-  `GERRIT_MIRROR=false`
-- Users who used `--depth` or `--branch`: Add `--no-mirror` explicitly
-  (these are incompatible with mirror mode)
-- CI/CD pipelines that expect working directories: Update to use
-  `mirror: false` or set environment variable
-- Users with config files: Add `mirror: false` to config file if they
-  want non-mirror mode by default
+- Users who want bare mirrors: Add `--mirror`, set `GERRIT_MIRROR=true`,
+  add `mirror: true` to the config file, or set the Action input
+  `mirror: true`
+- Users who passed `--no-mirror`: Nothing to change; `clone` still accepts it
+- Existing trees are not converted: `clone` refreshes a bare mirror it
+  finds as a mirror and prints one notice with the count
 
 ## Related Files
 

@@ -93,7 +93,8 @@ class ConfigManager(EnvConfigLoader):
             threads: Number of concurrent clone threads
             depth: Git clone depth (shallow clone)
             branch: Specific branch to clone
-            mirror: Use git clone --mirror for complete metadata (default: True)
+            mirror: Clone bare mirrors with git clone --mirror instead of
+                working copies (default: False)
             use_https: Use HTTPS for cloning instead of SSH
             keep_remote_protocol: Keep original clone protocol for remote
             strict_host_checking: Enforce strict SSH host key checking

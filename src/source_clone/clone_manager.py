@@ -44,6 +44,7 @@ from source_clone.clone_results import (
 )
 from source_clone.clone_stages import (
     announce_clone_start,
+    announce_existing_bare_mirrors,
     announce_source_connection,
     clone_missing_repos,
     partition_existing_repos,
@@ -259,6 +260,7 @@ def _run_clone_pipeline(
 
     # Perform gap analysis - check which repos actually need cloning vs refreshing
     repos_needing_clone, repos_to_refresh = partition_existing_repos(config, projects)
+    announce_existing_bare_mirrors(config, repos_to_refresh)
 
     # Only show clone messages and progress if there are repos to clone
     if repos_needing_clone:

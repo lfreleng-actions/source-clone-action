@@ -215,7 +215,7 @@ BRANCH = typer.Option(
 MIRROR = typer.Option(
     None,
     "--mirror/--no-mirror",
-    help="Use git clone --mirror for complete repository metadata (all refs, tags, branches). Creates bare repository. Incompatible with --depth and --branch.",
+    help="clone makes working copies by default. --mirror makes bare mirrors instead (git clone --mirror): every ref, tag and branch, with no working tree, for backups or later mirroring. Incompatible with --depth and --branch.",
     envvar="GERRIT_MIRROR",
 )
 USE_HTTPS = typer.Option(

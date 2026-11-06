@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 The Linux Foundation
 
-"""The action's ``mirror: auto`` default, and the CLI's mirror warning.
+"""The action's ``mirror: auto`` value, and the CLI's mirror warning.
 
 A bare mirror suits Gerrit backup and migration, but a GitHub source is
-usually wanted as working trees for tools that read files.  The action
-picks per source; the CLI keeps mirroring by default and says how to
-keep ``--depth`` and ``--branch`` when mirror mode drops them.
+usually wanted as working copies for tools that read files.  Both the
+action and the CLI make working copies by default; ``mirror: auto``
+stays accepted and picks per source, and the CLI says how to keep
+``--depth`` and ``--branch`` when mirror mode drops them.
 """
 
 from __future__ import annotations
@@ -34,11 +35,11 @@ def _mirror_flags(args: list[str] | None) -> list[str]:
     return [arg for arg in args if arg in ("--mirror", "--no-mirror")]
 
 
-def test_action_defaults_to_auto() -> None:
-    """New action commits resolve mirroring per source."""
+def test_action_still_documents_auto() -> None:
+    """Callers that set auto keep getting what it meant."""
     inputs = yaml.safe_load(ACTION_YAML.read_text())["inputs"]
 
-    assert inputs["mirror"]["default"] == "auto"
+    assert '"auto"' in inputs["mirror"]["description"]
 
 
 @pytest.mark.parametrize(
@@ -47,8 +48,7 @@ def test_action_defaults_to_auto() -> None:
         ({"INPUT_HOST": GITHUB_HOST}, "--no-mirror"),
         ({"INPUT_HOST": "https://github.com/example-org"}, "--no-mirror"),
         ({"INPUT_HOST": GERRIT_HOST}, "--mirror"),
-        ({"INPUT_HOST": GERRIT_HOST, "INPUT_MIRROR": ""}, "--mirror"),
-        ({"INPUT_HOST": GITHUB_HOST, "INPUT_MIRROR": ""}, "--no-mirror"),
+        ({"INPUT_HOST": GERRIT_HOST, "INPUT_MIRROR": "AUTO"}, "--mirror"),
         (
             {"INPUT_HOST": "git.example.org/org", "INPUT_SOURCE_TYPE": "GitHub"},
             "--no-mirror",
@@ -72,8 +72,8 @@ def test_action_defaults_to_auto() -> None:
 def test_auto_resolves_per_source(
     clone_step: ActionCloneStep, inputs: dict[str, str], expected: str
 ) -> None:
-    """auto mirrors Gerrit sources and clones GitHub working trees."""
-    step = clone_step.run(**inputs)
+    """auto mirrors Gerrit sources and clones GitHub working copies."""
+    step = clone_step.run(**{"INPUT_MIRROR": "auto", **inputs})
 
     assert step.returncode == 0, step.output
     assert _mirror_flags(step.args) == [expected]
@@ -115,8 +115,8 @@ def test_cli_warning_names_no_mirror_for_github(
     assert all("--no-mirror" in w for w in warnings if f"--{option}" in w)
 
 
-def test_cli_still_mirrors_by_default(tmp_path: Path) -> None:
-    """Only the action's default changes; the CLI's does not."""
+def test_cli_makes_working_copies_by_default(tmp_path: Path) -> None:
+    """The CLI's default matches the action's: working copies."""
     config = Config(
         host=GITHUB_HOST,
         source_type=SourceType.GITHUB,
@@ -124,4 +124,4 @@ def test_cli_still_mirrors_by_default(tmp_path: Path) -> None:
         path=tmp_path,
     )
 
-    assert config.mirror is True
+    assert config.mirror is False
