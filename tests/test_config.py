@@ -125,12 +125,12 @@ class TestConfigManager:
         assert config.retry_policy.max_attempts == 4
         assert config.retry_policy.base_delay == 3.0
 
-    def test_load_config_mirror_default_true(self):
-        """Test that mirror defaults to True."""
+    def test_load_config_mirror_default_false(self):
+        """Test that mirror defaults to False: clone makes working copies."""
         manager = ConfigManager()
         config = manager.load_config(host="gerrit.example.org")
 
-        assert config.mirror is True
+        assert config.mirror is False
 
     def test_load_config_mirror_explicit_false(self):
         """Test setting mirror to False explicitly."""

@@ -64,8 +64,8 @@ FILTERED_WORKING_COPY_REFUSAL = (
     "remote-tracking branch for a refresh to follow -- filtering a working "
     "copy in place, as clone --no-mirror did before 2.4.3, removes them -- "
     "so it cannot be refreshed. Delete it, then clone it again with the "
-    "same filters: since 2.4.3, clone --no-mirror filters a new working "
-    "copy of a branch through a copy, so it keeps its remote-tracking "
+    "same filters: since 2.4.3, clone filters each new working copy of a "
+    "branch through a copy, so it keeps its remote-tracking "
     "branch and later refreshes follow it"
 )
 

@@ -110,11 +110,14 @@ def clone(
         # Clone to specific directory with custom threads
         source-clone clone --host gerrit.example.org --output-path ./repos --threads 8
 
-        # Clone the GitHub repositories a file lists, as working trees
-        source-clone clone --host github.com/myorg --no-mirror --depth 1 --include-projects-file repos.txt
+        # Clone the GitHub repositories a file lists, shallow
+        source-clone clone --host github.com/myorg --depth 1 --include-projects-file repos.txt
 
         # Clone with shallow depth and specific branch
-        source-clone clone --host gerrit.example.org --no-mirror --depth 10 --branch main
+        source-clone clone --host gerrit.example.org --depth 10 --branch main
+
+        # Back up every ref as bare mirrors instead of working copies
+        source-clone clone --host gerrit.example.org --mirror
 
         # Clone with explicit HTTP credentials (highest priority)
         source-clone clone --host gerrit.example.org --https --http-user myuser --http-password mypass

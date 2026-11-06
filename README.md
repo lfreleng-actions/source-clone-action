@@ -40,8 +40,9 @@ This tool used to be `gerrit-clone`. The PyPI package and the command are now
   multiplier; override either with `--threads`)
 - **Hierarchy Preservation**: Maintains complete Gerrit project folder
   structure without flattening
-- **Complete Metadata Cloning**: Uses `git clone --mirror` by default to
-  capture all refs, tags, and branches for complete repository backups
+- **Working Copies or Full Mirrors**: Clones working copies by default;
+  `--mirror` makes bare mirrors (`git clone --mirror`) holding all refs,
+  tags, and branches for complete repository backups
 - **GitHub Mirroring**: Mirror Gerrit repositories to GitHub organizations
   with automatic name transformation
 - **Robust Retry Logic**: Exponential backoff with full jitter for transient
@@ -113,21 +114,21 @@ source-clone clone --host gerrit.example.org \
   --threads 8
 ```
 
-Clone with shallow depth and specific branch (requires --no-mirror):
+Clone with shallow depth and specific branch:
 
 ```bash
 source-clone clone --host gerrit.example.org \
-  --no-mirror \
   --depth 10 \
   --branch main \
   --threads 16
 ```
 
-Clone without mirror mode (standard clone with working directory):
+Back up every ref, tag and branch as bare mirrors instead of working copies:
 
 ```bash
 source-clone clone --host gerrit.example.org \
-  --no-mirror
+  --mirror \
+  --output-path ./backup
 ```
 
 Include archived repositories and use custom SSH key:
@@ -200,49 +201,70 @@ current directory, and any absolute path.
 This design prevents repository naming conflicts when running concurrent
 clone operations in the same directory (e.g., on GitHub Actions runners).
 
-### Understanding Mirror Mode
+### Working Copies and Mirrors
 
-By default, `source-clone` uses `git clone --mirror` to create **bare repositories**
-that contain complete metadata from the remote repository:
+By default, `clone` makes **working copies**: an ordinary `git clone` of
+each project, with its files checked out on the default branch (or the one
+`--branch` names), ready to `cd` into, read, build or edit. `--depth` makes
+them shallow.
+
+With `--mirror`, `clone` uses `git clone --mirror` to make **bare mirrors**
+instead, holding complete metadata from the remote repository:
 
 - ✅ All branches (not just the default)
 - ✅ All tags
 - ✅ All refs and notes
 - ✅ Complete commit history
-- ✅ Perfect for backups and mirrors
+- ❌ No working directory: you cannot browse or edit files in place
 
-**Important**: Mirror mode creates **bare repositories** (no working directory).
-This is ideal for:
+**When to use `--mirror`**:
 
 - Creating complete backups
-- Mirroring to other Git servers (e.g., GitHub)
+- Mirroring to other Git servers later
 - Archival purposes
 - CI/CD pipelines that only need repository metadata
 
-**When to use `--no-mirror`**:
-
-- You need a working directory to browse/edit files
-- You only want a specific branch (`--branch`)
-- You want a shallow clone (`--depth`)
+`GERRIT_MIRROR=true` or `mirror: true` in a config file selects mirror mode
+too, and `--no-mirror` asks for working copies explicitly.
 
 **Note**: The `--mirror` flag is incompatible with `--depth` and `--branch`.
 If you specify mirror mode along with these options, the tool ignores them with
 a warning. For a GitHub source, the warning names `--no-mirror`.
 
-The GitHub Action defaults its `mirror` input to `auto`: it mirrors Gerrit
-sources and makes working-tree clones of GitHub sources. It tells them
-apart as the CLI does: the `source-type` input, else the `SOURCE_TYPE`
-environment variable, else the host. Set `mirror: true`
-or `mirror: false` to choose a mode for every source. The CLI keeps mirror
-mode as its default.
+The `mirror` command (Gerrit to GitHub) always clones bare mirrors, since it
+pushes with `git push --mirror`.
+
+The GitHub Action makes working copies by default too (`mirror: false`).
+Set `mirror: true` for bare mirrors of every source, or `mirror: auto` to
+mirror Gerrit sources and make working copies of GitHub sources. `auto`
+tells them apart as the CLI does: the `source-type` input, else the
+`SOURCE_TYPE` environment variable, else the host.
+
+### Upgrading to 4.0
+
+Release 4.0 changes what `clone` and the Action make by default:
+
+- `clone` and the Action now make **working copies**, where earlier
+  releases made bare mirrors (the Action's `auto` default mirrored Gerrit
+  sources). To keep making bare mirrors, pass `--mirror`, set
+  `GERRIT_MIRROR=true`, set `mirror: true` in the config file, or set the
+  Action input `mirror: true`.
+- `--depth` and `--branch` now take effect without `--no-mirror`.
+  `--no-mirror` is still accepted.
+- Existing trees are not converted. `clone` over an existing tree refreshes
+  each bare mirror it finds as a mirror, and makes working copies only of
+  projects it clones for the first time. It prints one notice giving the
+  number of bare mirrors it found: pass `--mirror` to keep the tree
+  mirrored, or delete them and clone again to get working copies.
+- The `mirror` command still clones bare mirrors, as before.
 
 ### Refresh Command Examples
 
-`refresh` finds both kinds of clone beneath the output path. A default
-(mirror) clone is a bare repository, so it has no branch to pull: refresh
+`refresh` finds both kinds of clone beneath the output path. A `--mirror`
+clone is a bare repository, so it has no branch to pull: refresh
 fetches every ref into it and prunes refs deleted upstream (unless
 `--no-prune`). The branch options (`--strategy`, `--auto-stash`, `--force`,
-`--force-hard`) apply to working-tree (`--no-mirror`) clones only. Refresh
+`--force-hard`) apply to working copies, the default clone, only. Refresh
 skips a bare repository with no fetch refspec that updates a ref, such as
 one made by `git clone --bare`, and says why: fetching it would update
 nothing. If the
@@ -274,13 +296,13 @@ Each repository also records which filters rewrote it. Fetching would force
 the original history back, filtered content included, so refresh copies each
 mirror it filters, fetches and filters the copy, and publishes its refs only
 when every step succeeds; a failure leaves the mirror unchanged. Refresh
-treats a working copy (`--no-mirror`) it filters the same way. It fetches and
+treats a working copy it filters the same way. It fetches and
 filters a copy, kept inside the checkout's git directory. The checkout takes
 the result only when fetching and filtering succeed and the filtered history
 extends what the checkout holds; otherwise it stays unchanged, with any stash
 put back. Once it has taken the result as its remote-tracking branches, it
 fast-forwards or rebases as a pull would, and a conflict there leaves it as a
-conflicting pull does. `clone --no-mirror` filters each new working copy
+conflicting pull does. `clone` filters each new working copy
 through a copy too, without fetching again, so it keeps its remote-tracking
 branches and later refreshes follow it. When the filters rewrite it, its
 branch then moves to the filtered upstream (a clone of a single tag moves to
@@ -1193,7 +1215,7 @@ jobs:
           host: gerrit.example.org
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           output-path: repositories
-          mirror: true  # Default: creates bare repos with complete metadata
+          mirror: true  # Bare mirrors with complete metadata (default: false)
 ```
 
 ### Advanced Example
@@ -1220,7 +1242,7 @@ jobs:
           output-path: workspace
           skip-archived: true
           threads: 12
-          mirror: false  # Use --no-mirror for working directory
+          mirror: false  # Default: working copies (passes --no-mirror)
           depth: 1
           branch: main
           use-https: false
@@ -1353,7 +1375,7 @@ jobs:
 | `github-token`          | No       |                       | GitHub personal access token; required for GitHub sources, public or private                                                                                       |
 | `github-org`            | No       |                       | GitHub organization or user (auto-detected from host)                                                                                                              |
 | `use-gh-cli`            | No       | `false`               | Use GitHub CLI (`gh`) for cloning instead of git                                                                                                                   |
-| `mirror`                | No       | `auto`                | `auto` mirrors Gerrit sources and makes working-tree clones of GitHub sources; `true` always mirrors; `false` always makes working-tree clones                     |
+| `mirror`                | No       | `false`               | `false` makes working copies; `true` makes bare mirrors; `auto` mirrors Gerrit sources and makes working copies of GitHub sources                                  |
 | `output-path`           | No       | `.`                   | Clone destination; an empty value or a spelling of `.` such as `./` creates `./{SERVER}/` or `./github.com/{ORG}/`; the tool uses any other value exactly as given |
 | `skip-archived`         | No       | `true`                | Skip archived and inactive repositories                                                                                                                            |
 | `include-projects`      | No       |                       | Restrict to specific project(s); comma/space-separated, wildcard and hierarchical patterns                                                                         |

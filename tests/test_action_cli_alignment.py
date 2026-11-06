@@ -14,13 +14,16 @@ import inspect
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
 import yaml
 
 # Import the CLI app to introspect its options
 from source_clone.cli import clone as clone_command
+
+if TYPE_CHECKING:
+    from tests.conftest import ActionCloneStep
 
 # Path to the action.yaml file (relative to project root)
 ACTION_YAML_PATH = Path(__file__).parent.parent / "action.yaml"
@@ -630,3 +633,69 @@ def test_ci_runs_source_clone() -> None:
     )
     assert "source-clone clone" in commands
     assert "gerrit-clone" not in commands
+
+
+GITHUB = "github.com/example-org"
+GERRIT = "gerrit.example.org"
+
+
+class TestActionMirrorInput:
+    """The action makes working copies unless ``mirror`` is ``true``.
+
+    It always passes ``--mirror`` or ``--no-mirror``, so what it does
+    never depends on the CLI release ``uvx`` resolves.
+    """
+
+    @staticmethod
+    def _mirror_flags(args: list[str] | None) -> list[str]:
+        assert args is not None, "the step never ran the CLI"
+        return [arg for arg in args if arg in ("--mirror", "--no-mirror")]
+
+    def test_input_defaults_to_false(self, action_yaml: dict[str, Any]) -> None:
+        assert action_yaml["inputs"]["mirror"]["default"] == "false"
+
+    @pytest.mark.parametrize("host", [GITHUB, GERRIT])
+    @pytest.mark.parametrize("value", ["true", "TRUE"])
+    def test_true_passes_mirror(
+        self, clone_step: ActionCloneStep, host: str, value: str
+    ) -> None:
+        step = clone_step.run(INPUT_HOST=host, INPUT_MIRROR=value)
+
+        assert step.returncode == 0, step.output
+        assert self._mirror_flags(step.args) == ["--mirror"]
+
+    @pytest.mark.parametrize(
+        ("host", "value"),
+        [
+            (GITHUB, "false"),
+            (GERRIT, "false"),
+            (GITHUB, ""),
+            (GERRIT, ""),
+            (GITHUB, "yes"),
+            (GERRIT, "yes"),
+        ],
+    )
+    def test_anything_else_passes_no_mirror(
+        self, clone_step: ActionCloneStep, host: str, value: str
+    ) -> None:
+        step = clone_step.run(INPUT_HOST=host, INPUT_MIRROR=value)
+
+        assert step.returncode == 0, step.output
+        assert self._mirror_flags(step.args) == ["--no-mirror"]
+
+    @pytest.mark.parametrize("host", [GITHUB, GERRIT])
+    def test_omitted_input_makes_working_copies(
+        self,
+        clone_step: ActionCloneStep,
+        action_yaml: dict[str, Any],
+        host: str,
+    ) -> None:
+        default = action_yaml["inputs"]["mirror"]["default"]
+        step = clone_step.run(INPUT_HOST=host, INPUT_MIRROR=default)
+
+        assert step.returncode == 0, step.output
+        assert self._mirror_flags(step.args) == ["--no-mirror"]
+
+    def test_clone_keeps_both_flags(self, cli_option_names: set[str]) -> None:
+        """Older action commits pass either flag to the latest CLI."""
+        assert {"mirror", "no-mirror"} <= cli_option_names

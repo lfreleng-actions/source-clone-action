@@ -206,7 +206,7 @@ class RefreshWorker(FreshCheckoutMixin):
                 )
 
             if bare:
-                # A bare mirror -- the default clone -- has no working
+                # A bare mirror -- a --mirror clone -- has no working
                 # tree: no branch to repair or pull, nothing to stash.
                 # It is brought up to date by fetching every ref.
                 if not self._prepare_bare_repository(repo_path, result, started_at):

@@ -100,7 +100,8 @@ class Config:
     threads: int | None = None
     depth: int | None = None
     branch: str | None = None
-    mirror: bool = True  # Use git clone --mirror by default for complete metadata
+    # Working copies by default; True clones bare mirrors (git clone --mirror)
+    mirror: bool = False
     use_https: bool = False
     keep_remote_protocol: bool = False
     # Optional inclusion filter: if non-empty, only clone listed projects

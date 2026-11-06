@@ -145,13 +145,13 @@ inputs:
     required: false
   mirror:
     description: >-
-      "true" uses git clone --mirror for complete repository metadata
-      (all refs, tags, branches) in a bare repository, which ignores the
-      depth and branch options; "false" clones working trees. "auto"
-      (the default) mirrors Gerrit sources and clones GitHub sources as
-      working trees.
+      The action clones working copies by default ("false"). "true"
+      clones bare mirrors with git clone --mirror, holding every ref,
+      tag and branch with no working tree, and ignores the depth and
+      branch options. "auto" mirrors Gerrit sources and clones GitHub
+      sources as working copies.
     required: false
-    default: "auto"
+    default: "false"
   set-default-branch:
     description: >-
       After pushing to GitHub, set the default branch to match the HEAD
@@ -645,11 +645,14 @@ runs:
           cmd+=(--branch "${INPUT_BRANCH}")
         fi
 
-        # "auto" mirrors a Gerrit source, for backup and migration, and
-        # clones a GitHub source as working trees, for tools that read
-        # files. The source is detected as the CLI detects it: the
-        # source-type input, else the SOURCE_TYPE variable, else the host.
-        mirror="${INPUT_MIRROR:-auto}"
+        # Working copies unless mirror is "true". "auto" mirrors a Gerrit
+        # source, for backup and migration, and clones a GitHub source as
+        # working copies, for tools that read files. The source is
+        # detected as the CLI detects it: the source-type input, else the
+        # SOURCE_TYPE variable, else the host. One flag is always passed,
+        # so the result never depends on the CLI release uvx resolves.
+        mirror="${INPUT_MIRROR:-false}"
+        mirror="${mirror,,}"
         if [ "$mirror" = "auto" ]; then
           source_type="${INPUT_SOURCE_TYPE:-${SOURCE_TYPE:-}}"
           source_type="${source_type,,}"
@@ -668,10 +671,10 @@ runs:
           fi
           echo "mirror: auto resolves to $mirror for a $source_type source"
         fi
-        if [ "$mirror" = "false" ]; then
-          cmd+=(--no-mirror)
-        else
+        if [ "$mirror" = "true" ]; then
           cmd+=(--mirror)
+        else
+          cmd+=(--no-mirror)
         fi
 
         if [ "${INPUT_USE_HTTPS}" = "true" ]; then
