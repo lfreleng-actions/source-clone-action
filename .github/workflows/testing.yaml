@@ -7,11 +7,12 @@
 # Interim regime: anonymous HTTPS clones of a few small projects on the
 # public O-RAN-SC Gerrit, run for both the composite action and the CLI.
 # No credentials are used, so the job is safe to run on pull requests.
+# The action clones working copies, the default, and the CLI clones
+# bare mirrors (--mirror), so each run covers both modes.
 # The GitHub source test uses only the read-only workflow token to list
 # and clone this public repository.
-# SSH coverage returns with a disposable Gerrit container and a per-run
-# key; the content-filter tests return once they pass against bare
-# mirror clones.
+# SSH coverage and the content-filter tests return with a disposable
+# Gerrit container and a per-run key.
 name: "Test GitHub Action 🧪"
 
 # yamllint disable-line rule:truthy
@@ -88,6 +89,7 @@ jobs:
             --threads "2" \
             --https \
             --skip-archived \
+            --mirror \
             --include-projects "$TEST_PROJECTS"
 
       - name: "Validate clone results [HTTPS]"
@@ -96,12 +98,11 @@ jobs:
           ACTION_MANIFEST: ${{ steps.action-https.outputs.manifest-path }}
         run: |
           # Check each run's manifest counts and that every requested
-          # project is a git repository at its nested path.
+          # project is a clone of the expected kind at its nested path.
           status=0
-          for target in "action-https:$ACTION_MANIFEST" \
-                        "cli-https:cli-https/clone-manifest.json"; do
-            dir="${target%%:*}"
-            manifest="${target#*:}"
+          for target in "action-https|working copy|$ACTION_MANIFEST" \
+            "cli-https|bare mirror|cli-https/clone-manifest.json"; do
+            IFS='|' read -r dir kind manifest <<< "$target"
             if [ ! -f "$manifest" ]; then
               echo "::error::$dir: manifest not found ($manifest)"
               status=1
@@ -118,27 +119,35 @@ jobs:
             fi
             IFS=',' read -ra projects <<< "$TEST_PROJECTS"
             for project in "${projects[@]}"; do
-              # An empty prefix means the directory is a repository
-              # root; a plain directory would otherwise pass by
-              # resolving to the checkout's own .git.
-              prefix=$(git -C "$dir/$project" rev-parse --show-prefix \
-                2>/dev/null) || prefix="(not found)"
-              if [ -n "$prefix" ]; then
-                echo "::error::$dir: $project is not a git repository"
-                status=1
+              repo="$dir/$project"
+              if [ "$kind" = "bare mirror" ]; then
+                bare=$(git -C "$repo" rev-parse --is-bare-repository \
+                  2>/dev/null) || bare=""
+                [ "$bare" = "true" ] && continue
+              else
+                # An empty prefix means the directory is a repository
+                # root; a plain directory would otherwise pass by
+                # resolving to the checkout's own .git.
+                prefix=$(git -C "$repo" rev-parse --show-prefix \
+                  2>/dev/null) || prefix="(not found)"
+                tree=$(git -C "$repo" rev-parse --is-inside-work-tree \
+                  2>/dev/null) || tree=""
+                [ -z "$prefix" ] && [ "$tree" = "true" ] && continue
               fi
+              echo "::error::$dir: $project is not a $kind"
+              status=1
             done
             {
-              echo "### $dir"
+              echo "### $dir ($kind)"
               echo "- Cloned: $ok/$total (failed: $failed)"
               echo "- Size: $(du -sh "$dir" | awk '{print $1}')"
             } >> "$GITHUB_STEP_SUMMARY"
           done
           exit "$status"
 
-      # A GitHub source under the default mirror: auto should produce a
-      # working tree, not a bare mirror, and read its project list from a
-      # file inside the workspace.
+      # mirror: auto mirrors a Gerrit source, but a GitHub source should
+      # still produce a working tree, not a bare mirror. The run also
+      # reads its project list from a file inside the workspace.
       - name: "Write GitHub project list file"
         shell: bash
         run: |
@@ -153,6 +162,7 @@ jobs:
           github-token: ${{ github.token }}
           output-path: "action-github"
           include-projects-file: "github-projects.txt"
+          mirror: "auto"
           use-https: "true"
 
       - name: "Validate GitHub clone is a working tree"
