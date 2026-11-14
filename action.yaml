@@ -408,53 +408,77 @@ runs:
         INPUT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
         INPUT_PORT: ${{ inputs.port }}
 
+    # A source-clone already on PATH (from workflow setup) needs no
+    # Python and no installation, so both steps below are skipped.
+    - name: "Check for an installed source-clone CLI"
+      id: source-clone-cli
+      shell: bash
+      run: |
+        if command -v source-clone &> /dev/null; then
+          echo "source-clone CLI is already available"
+          source-clone --version
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    # The interpreter uv installs source-clone into. Without --python,
+    # UV_PYTHON, VIRTUAL_ENV or CONDA_PREFIX from the caller's job
+    # would choose it. update-environment: false keeps this step from
+    # changing the caller's PATH or environment.
+    - name: "Setup Python for source-clone"
+      id: setup-python
+      if: steps.source-clone-cli.outputs.installed != 'true'
+      # yamllint disable-line rule:line-length
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: "3.13"
+        update-environment: false
+
     - name: "Install and setup source-clone CLI"
+      if: steps.source-clone-cli.outputs.installed != 'true'
       shell: bash
       env:
         INPUT_BUILD_FROM_SOURCE: ${{ inputs.build-from-source }}
+        PYTHON: ${{ steps.setup-python.outputs.python-path }}
       # The only $GITHUB_PATH write below appends a path under the
       # runner-provided $HOME ("$HOME/.local/bin") so the source-clone
       # wrapper is on PATH for the subsequent clone step; the value is
       # not derived from any action input or other user-controllable
       # source.
       run: | # zizmor: ignore[github-env]
-        # Check if source-clone is already installed (from workflow setup)
-        if command -v source-clone &> /dev/null; then
-          echo "source-clone CLI is already available"
-          source-clone --version
-        else
-          # Install uv if not available
-          if ! command -v uv &> /dev/null; then
-            echo "Installing uv..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            export PATH="$HOME/.cargo/bin:$PATH"
-          fi
-
-          if [ "${INPUT_BUILD_FROM_SOURCE}" = "true" ]; then
-            # Build and install from the action's own source tree
-            echo "Building source-clone from source..."
-            echo "Source path: $GITHUB_ACTION_PATH"
-            uv tool install "$GITHUB_ACTION_PATH"
-          else
-            # Install from PyPI using uvx (isolated environment)
-            echo "Installing source-clone from PyPI..."
-            uvx source-clone --help > /dev/null || {
-              echo "Failed to install source-clone via uvx"
-              exit 1
-            }
-
-            # Create wrapper so source-clone is available in PATH
-            mkdir -p "$HOME/.local/bin"
-            printf '#!/bin/bash\nexec uvx source-clone "$@"\n' \
-              > "$HOME/.local/bin/source-clone"
-            chmod +x "$HOME/.local/bin/source-clone"
-            export PATH="$HOME/.local/bin:$PATH"
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          fi
-
-          # Verify installation
-          source-clone --version
+        # Install uv if not available
+        if ! command -v uv &> /dev/null; then
+          echo "Installing uv..."
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.cargo/bin:$PATH"
         fi
+
+        if [ "${INPUT_BUILD_FROM_SOURCE}" = "true" ]; then
+          # Build and install from the action's own source tree
+          echo "Building source-clone from source..."
+          echo "Source path: $GITHUB_ACTION_PATH"
+          uv tool install --python "$PYTHON" "$GITHUB_ACTION_PATH"
+        else
+          # Install from PyPI using uvx (isolated environment)
+          echo "Installing source-clone from PyPI..."
+          uvx --python "$PYTHON" source-clone --help > /dev/null || {
+            echo "Failed to install source-clone via uvx"
+            exit 1
+          }
+
+          # Create wrapper so source-clone is available in PATH; it
+          # pins the same interpreter as the install above
+          mkdir -p "$HOME/.local/bin"
+          printf '#!/bin/bash\nexec uvx --python %q source-clone "$@"\n' \
+            "$PYTHON" > "$HOME/.local/bin/source-clone"
+          chmod +x "$HOME/.local/bin/source-clone"
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        fi
+
+        # Verify installation
+        source-clone --version
 
     - name: "Clone repositories"
       id: clone

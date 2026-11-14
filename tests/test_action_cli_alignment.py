@@ -610,11 +610,47 @@ class TestActionRunsSourceClone:
     """The Action installs and runs the CLI as ``source-clone``."""
 
     def test_install_step_uses_source_clone(self, install_script: str) -> None:
-        assert "command -v source-clone " in install_script
-        assert "uvx source-clone --help" in install_script
-        assert "exec uvx source-clone " in install_script
+        assert 'uvx --python "$PYTHON" source-clone --help' in install_script
+        assert "exec uvx --python %q source-clone " in install_script
         assert '"$HOME/.local/bin/source-clone"' in install_script
         assert "gerrit-clone" not in install_script
+
+    def test_install_step_pins_its_interpreter(
+        self, action_yaml: dict[str, Any]
+    ) -> None:
+        """uv gets setup-python's interpreter, not one the caller's env picks."""
+        steps = action_yaml["runs"]["steps"]
+        setup = next(s for s in steps if s.get("id") == "setup-python")
+        assert setup["uses"].startswith("actions/setup-python@")
+        assert setup["with"]["update-environment"] is False
+        install = next(s for s in steps if "uvx " in s.get("run", ""))
+        assert (
+            install["env"]["PYTHON"] == "${{ steps.setup-python.outputs.python-path }}"
+        )
+        script = install["run"]
+        assert 'uv tool install --python "$PYTHON" ' in script
+        for line in script.splitlines():
+            words = line.split()
+            if words[:1] == ["uvx"] or words[:3] == ["uv", "tool", "install"]:
+                assert "--python" in words, line
+        assert "exec uvx --python %q " in script
+
+    def test_preinstalled_cli_skips_python_setup_and_install(
+        self, action_yaml: dict[str, Any]
+    ) -> None:
+        """A source-clone already on PATH needs no Python and no install."""
+        steps = action_yaml["runs"]["steps"]
+        ids = [s.get("id") for s in steps]
+        probe = steps[ids.index("source-clone-cli")]
+        assert "command -v source-clone " in probe["run"]
+        assert "installed=true" in probe["run"]
+        assert "installed=false" in probe["run"]
+        install = next(s for s in steps if "uvx " in s.get("run", ""))
+        assert ids.index("source-clone-cli") < ids.index("setup-python")
+        assert ids.index("setup-python") < steps.index(install)
+        gate = "steps.source-clone-cli.outputs.installed != 'true'"
+        assert steps[ids.index("setup-python")]["if"] == gate
+        assert install["if"] == gate
 
     def test_command_array_starts_source_clone(self, action_shell_script: str) -> None:
         assert "cmd=(source-clone clone)" in action_shell_script
