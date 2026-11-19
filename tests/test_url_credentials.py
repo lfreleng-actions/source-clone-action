@@ -85,6 +85,11 @@ class TestRemoteLocation:
     ) -> None:
         assert remote_location(url) == location
 
+    @pytest.mark.xfail(strict=True, reason="int() refuses over 4300 digits")
+    def test_a_port_too_long_to_convert_is_unrecognised(self) -> None:
+        """A port past int()'s digit limit is an unknown shape, not a crash."""
+        assert remote_location("ssh://h:" + "9" * 4301 + "/r") is None
+
 
 class TestRedactUrl:
     @pytest.mark.parametrize(
@@ -136,6 +141,13 @@ class TestRedactUrl:
     ) -> None:
         assert redact_url(url) == redacted
         assert TOKEN not in redact_url(url)
+
+    @pytest.mark.xfail(strict=True, reason="recurses once per helper")
+    def test_deeply_nested_helpers_are_redacted(self) -> None:
+        """Helper nesting deeper than the recursion limit is still redacted."""
+        helpers = "a::" * 1200
+        url = f"{helpers}https://u:{TOKEN}@host/r"
+        assert redact_url(url) == f"{helpers}https://host/r"
 
 
 class TestRedactText:

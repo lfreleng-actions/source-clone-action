@@ -148,6 +148,18 @@ class TestGetProjectPath:
         # Should handle dangerous paths safely
         assert ".." not in str(result)
 
+    @pytest.mark.xfail(strict=True, reason="stripping dots exposes a leading '/'")
+    @pytest.mark.parametrize(
+        "project_name", ["../etc", "..//etc", ".../etc", "..\\etc", " ../etc"]
+    )
+    def test_get_project_path_stays_under_base(self, project_name: str) -> None:
+        """A leading traversal never yields a path outside the base."""
+        base = Path("/tmp/repos")
+        result = get_project_path(project_name, base)
+        assert result.is_relative_to(base)
+        assert result != base
+        assert ".." not in result.relative_to(base).parts
+
     def test_get_project_path_absolute_base(self) -> None:
         """Test with absolute base path."""
         base = Path("/home/user/repos").resolve()
