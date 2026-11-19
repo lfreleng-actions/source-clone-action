@@ -121,10 +121,15 @@ def remote_location(url: str) -> RemoteLocation | None:
         return None
     host = host_port.group("ipv6") or host_port.group("name") or ""
     port = host_port.group("port")
+    try:
+        port_number = int(port) if port else None
+    except ValueError:
+        # Past int()'s digit limit: no port, so a shape not recognised.
+        return None
     return RemoteLocation(
         scheme=scheme,
         host=host.lower().rstrip("."),
-        port=int(port) if port else None,
+        port=port_number,
         path=path,
     )
 

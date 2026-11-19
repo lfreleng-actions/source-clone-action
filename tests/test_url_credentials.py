@@ -85,7 +85,6 @@ class TestRemoteLocation:
     ) -> None:
         assert remote_location(url) == location
 
-    @pytest.mark.xfail(strict=True, reason="int() refuses over 4300 digits")
     def test_a_port_too_long_to_convert_is_unrecognised(self) -> None:
         """A port past int()'s digit limit is an unknown shape, not a crash."""
         assert remote_location("ssh://h:" + "9" * 4301 + "/r") is None
