@@ -1731,6 +1731,33 @@ uv run pytest -m "not integration" -v  # Unit tests
 uv run pytest tests/test_models.py::TestConfig -v  # Specific test class
 ```
 
+### Fuzzing
+
+Two [Atheris](https://github.com/google/atheris) harnesses in
+`tests/fuzz/` check contracts that protect credentials and the
+clone directory:
+
+- `fuzz_url_safety.py`: clone URL checks never accept a password
+  or token, redaction removes userinfo and secrets, and parsing a
+  remote returns a location or nothing.
+- `fuzz_project_paths.py`: a project name always maps to a path
+  under the base directory.
+
+Atheris is not a project dependency. Run a harness with it added
+for one command:
+
+```bash
+# Fuzz for 60 seconds
+uv run --with atheris python tests/fuzz/fuzz_url_safety.py -max_total_time=60
+
+# Replay one input file, such as a crash file
+uv run --with atheris python tests/fuzz/fuzz_project_paths.py crash-file
+```
+
+Each harness keeps seed inputs, including past findings. The unit
+test `tests/unit/test_fuzz_harnesses.py` replays every seed without
+Atheris, so the normal test run guards these contracts.
+
 ### Linting
 
 ```bash

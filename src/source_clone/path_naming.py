@@ -129,8 +129,10 @@ def sanitize_project_name(project_name: str) -> str:
     leading_dot = sanitized.startswith(".") and not sanitized.startswith("..")
     sanitized = sanitized.strip("/\\")
     if not leading_dot:
-        # Only strip leading dot if it wasn't a legitimate project like ".github"
-        sanitized = sanitized.lstrip(".")
+        # Only strip leading dot if it wasn't a legitimate project like ".github".
+        # Slashes go with the dots: "../etc" would otherwise become "/etc",
+        # which replaces the base path it is joined to.
+        sanitized = sanitized.lstrip("./")
     sanitized = sanitized.rstrip(".")
 
     if sanitized in {".", "..", ".git"}:
