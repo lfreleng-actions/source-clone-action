@@ -148,7 +148,6 @@ class TestGetProjectPath:
         # Should handle dangerous paths safely
         assert ".." not in str(result)
 
-    @pytest.mark.xfail(strict=True, reason="stripping dots exposes a leading '/'")
     @pytest.mark.parametrize(
         "project_name", ["../etc", "..//etc", ".../etc", "..\\etc", " ../etc"]
     )
