@@ -144,9 +144,15 @@ def redact_url(url: str) -> str:
     ``://`` gives :data:`UNRECOGNISED_URL`, since what part of it is a
     credential cannot be told.
     """
-    helper = _REMOTE_HELPER.match(url)
-    if helper:
-        return f"{helper.group('transport')}::{redact_url(helper.group('address'))}"
+    transports: list[str] = []
+    while helper := _REMOTE_HELPER.match(url):
+        transports.append(f"{helper.group('transport')}::")
+        url = helper.group("address")
+    return "".join(transports) + _redact_address(url)
+
+
+def _redact_address(url: str) -> str:
+    """*url*, which names no remote helper, redacted as :func:`redact_url` says."""
     hierarchical = _HIERARCHICAL.match(url)
     if hierarchical:
         scheme = hierarchical.group("scheme") or ""

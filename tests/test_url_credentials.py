@@ -141,7 +141,6 @@ class TestRedactUrl:
         assert redact_url(url) == redacted
         assert TOKEN not in redact_url(url)
 
-    @pytest.mark.xfail(strict=True, reason="recurses once per helper")
     def test_deeply_nested_helpers_are_redacted(self) -> None:
         """Helper nesting deeper than the recursion limit is still redacted."""
         helpers = "a::" * 1200
