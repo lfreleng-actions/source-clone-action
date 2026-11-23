@@ -8,7 +8,6 @@ ci:
     - gha-workflow-linter
     - aislop
     - basedpyright
-    - pytest
   autofix_commit_msg: |
     Chore: Pre-commit autofixes
 
@@ -159,13 +158,3 @@ repos:
         types:
           - yaml
       - id: check-readthedocs
-
-  - repo: local
-    hooks:
-      - id: pytest
-        name: pytest
-        entry: uv
-        args: [run, pytest, --tb=short, -q, --ignore=tests/integration]
-        language: system
-        pass_filenames: false
-        always_run: true
